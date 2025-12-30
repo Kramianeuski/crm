@@ -28,6 +28,13 @@ export default function Login({ onAuthenticated }: Props) {
       onAuthenticated();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Ошибка авторизации';
+      const friendly =
+        message === 'invalid_credentials'
+          ? 'Неверный email или пароль'
+          : message === 'invalid_request'
+            ? 'Введите email и пароль'
+            : message;
+      setError(friendly || 'Ошибка авторизации');
       setError(message);
     } finally {
       setLoading(false);

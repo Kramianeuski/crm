@@ -1,4 +1,20 @@
 export type User = {
+  id: number | string;
+  email: string;
+  lang?: string;
+  roles: string[];
+  permissions: string[];
+};
+
+type MeResponse = {
+  user: {
+    id: number | string;
+    email: string;
+    lang?: string;
+  };
+  roles: { code: string; name?: string }[];
+  permissions: string[];
+  lang?: string;
   email: string;
 };
 
@@ -39,6 +55,27 @@ async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<
     headers
   });
 
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const payload = isJson ? await response.json().catch(() => null) : await response.text();
+
+  if (!response.ok) {
+    const message =
+      typeof payload === 'string'
+        ? payload || 'Request failed'
+        : payload?.error || payload?.message || 'Request failed';
+    throw new Error(message);
+  }
+
+  return (payload ?? {}) as T;
+}
+
+export async function login(email: string, password: string) {
+  const data = await apiFetch<{ token: string }>('/core/v1/auth/login', {
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || 'Request failed');
@@ -62,5 +99,13 @@ export async function login(email: string, password: string) {
 }
 
 export async function fetchCurrentUser(): Promise<User> {
+  const data = await apiFetch<MeResponse>('/core/v1/auth/me');
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    lang: data.lang || data.user.lang,
+    roles: data.roles.map((role) => role.code),
+    permissions: data.permissions
+  };
   return apiFetch<User>('/v1/auth/me');
 }
