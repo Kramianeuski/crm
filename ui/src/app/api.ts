@@ -15,6 +15,7 @@ type MeResponse = {
   roles: { code: string; name?: string }[];
   permissions: string[];
   lang?: string;
+  email: string;
 };
 
 const API_PREFIX = '/api';
@@ -75,6 +76,20 @@ async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<
 
 export async function login(email: string, password: string) {
   const data = await apiFetch<{ token: string }>('/core/v1/auth/login', {
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Request failed');
+  }
+
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  return response.json() as Promise<T>;
+}
+
+export async function login(email: string, password: string) {
+  const data = await apiFetch<{ token: string }>('/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
     skipAuth: true
@@ -92,4 +107,5 @@ export async function fetchCurrentUser(): Promise<User> {
     roles: data.roles.map((role) => role.code),
     permissions: data.permissions
   };
+  return apiFetch<User>('/v1/auth/me');
 }

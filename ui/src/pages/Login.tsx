@@ -35,6 +35,7 @@ export default function Login({ onAuthenticated }: Props) {
             ? 'Введите email и пароль'
             : message;
       setError(friendly || 'Ошибка авторизации');
+      setError(message);
     } finally {
       setLoading(false);
     }
