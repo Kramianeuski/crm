@@ -1,3 +1,7 @@
+/* ===============================
+   Types
+   =============================== */
+
 export type User = {
   id: number | string;
   email: string;
@@ -15,8 +19,11 @@ type MeResponse = {
   roles: { code: string; name?: string }[];
   permissions: string[];
   lang?: string;
-  email: string;
 };
+
+/* ===============================
+   Constants
+   =============================== */
 
 const API_PREFIX = '/api';
 const AUTH_STORAGE_KEY = 'crm_token';
@@ -24,6 +31,10 @@ const AUTH_STORAGE_KEY = 'crm_token';
 type RequestOptions = RequestInit & {
   skipAuth?: boolean;
 };
+
+/* ===============================
+   Token storage
+   =============================== */
 
 export const tokenStore = {
   get(): string | null {
@@ -37,8 +48,16 @@ export const tokenStore = {
   }
 };
 
-async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
+/* ===============================
+   Low-level fetch wrapper
+   =============================== */
+
+async function apiFetch<T>(
+  path: string,
+  options: RequestOptions = {}
+): Promise<T> {
   const headers = new Headers(options.headers || {});
+
   if (!options.skipAuth) {
     const token = tokenStore.get();
     if (token) {
@@ -46,7 +65,11 @@ async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<
     }
   }
 
-  if (options.body && !headers.has('Content-Type') && !(options.body instanceof FormData)) {
+  if (
+    options.body &&
+    !headers.has('Content-Type') &&
+    !(options.body instanceof FormData)
+  ) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -61,7 +84,10 @@ async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<
 
   const contentType = response.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
-  const payload = isJson ? await response.json().catch(() => null) : await response.text();
+
+  const payload = isJson
+    ? await response.json().catch(() => null)
+    : await response.text();
 
   if (!response.ok) {
     const message =
@@ -74,38 +100,32 @@ async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<
   return (payload ?? {}) as T;
 }
 
-export async function login(email: string, password: string) {
+/* ===============================
+   Auth API
+   =============================== */
+
+export async function login(
+  email: string,
+  password: string
+): Promise<string> {
   const data = await apiFetch<{ token: string }>('/core/v1/auth/login', {
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || 'Request failed');
-  }
-
-  if (response.status === 204) {
-    return {} as T;
-  }
-
-  return response.json() as Promise<T>;
-}
-
-export async function login(email: string, password: string) {
-  const data = await apiFetch<{ token: string }>('/v1/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
     skipAuth: true
   });
+
   tokenStore.set(data.token);
   return data.token;
 }
 
 export async function fetchCurrentUser(): Promise<User> {
   const data = await apiFetch<MeResponse>('/core/v1/auth/me');
+
   return {
     id: data.user.id,
     email: data.user.email,
     lang: data.lang || data.user.lang,
-    roles: data.roles.map((role) => role.code),
+    roles: data.roles.map((r) => r.code),
     permissions: data.permissions
   };
-  return apiFetch<User>('/v1/auth/me');
 }
