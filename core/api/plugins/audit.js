@@ -1,6 +1,8 @@
 'use strict';
 
-module.exports = async function auditPlugin(fastify) {
+const fp = require('fastify-plugin');
+
+module.exports = fp(async function auditPlugin(fastify) {
   fastify.addHook('onRequest', async request => {
     request.auditContext = {
       startedAt: Date.now(),
@@ -49,4 +51,4 @@ module.exports = async function auditPlugin(fastify) {
       }
     }
   });
-};
+});

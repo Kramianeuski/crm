@@ -1,8 +1,9 @@
 'use strict';
 
 const jwt = require('jsonwebtoken');
+const fp = require('fastify-plugin');
 
-module.exports = async function jwtPlugin(fastify) {
+module.exports = fp(async function jwtPlugin(fastify) {
   const JWT_SECRET = process.env.JWT_SECRET;
   const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '12h';
 
@@ -34,4 +35,4 @@ module.exports = async function jwtPlugin(fastify) {
       reply.code(401).send({ error: 'unauthorized' });
     }
   });
-};
+});

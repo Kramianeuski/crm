@@ -1,6 +1,8 @@
 'use strict';
 
-module.exports = async function errorHandlerPlugin(fastify) {
+const fp = require('fastify-plugin');
+
+module.exports = fp(async function errorHandlerPlugin(fastify) {
   fastify.setErrorHandler((error, request, reply) => {
     fastify.log.error({ err: error, reqId: request.id, url: request.url }, 'Unhandled error');
 
@@ -11,4 +13,4 @@ module.exports = async function errorHandlerPlugin(fastify) {
       message: error.message || 'Internal server error'
     });
   });
-};
+});
