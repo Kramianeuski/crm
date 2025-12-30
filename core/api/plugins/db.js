@@ -1,8 +1,9 @@
 'use strict';
 
 const { Pool } = require('pg');
+const fp = require('fastify-plugin');
 
-module.exports = async function dbPlugin(fastify) {
+module.exports = fp(async function dbPlugin(fastify) {
   const pool = new Pool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT),
@@ -26,4 +27,4 @@ module.exports = async function dbPlugin(fastify) {
   fastify.addHook('onClose', async () => {
     await pool.end();
   });
-};
+});

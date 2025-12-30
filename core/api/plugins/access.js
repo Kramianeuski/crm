@@ -1,8 +1,9 @@
 'use strict';
 
 const { canAccess } = require('../lib/canAccess');
+const fp = require('fastify-plugin');
 
-module.exports = async function accessPlugin(fastify) {
+module.exports = fp(async function accessPlugin(fastify) {
   fastify.decorate('canAccess', (user, resource, action, entity = null) =>
     canAccess(fastify.pg, user, resource, action, entity)
   );
@@ -18,4 +19,4 @@ module.exports = async function accessPlugin(fastify) {
       reply.code(403).send({ error: 'forbidden' });
     }
   });
-};
+});
