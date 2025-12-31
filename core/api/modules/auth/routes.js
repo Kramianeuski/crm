@@ -7,7 +7,7 @@ module.exports = async function authRoutes(fastify) {
     const { email, password } = request.body || {};
     if (!email || !password) return reply.code(400).send({ error: 'invalid_request' });
 
-    const result = await service.authenticate(fastify.pg, email, password);
+    const result = await service.authenticate(email, password);
     if (result.error) return reply.code(result.error === 'invalid_credentials' ? 401 : 403).send({ error: result.error });
 
     const token = fastify.signToken({
@@ -22,7 +22,7 @@ module.exports = async function authRoutes(fastify) {
   });
 
   fastify.get('/api/core/v1/auth/me', { preHandler: fastify.verifyJWT }, async (request, reply) => {
-    const ctx = await service.buildUserContext(fastify.pg, request.user.id);
+    const ctx = await service.buildUserContext(request.user.id);
     if (!ctx) return reply.code(404).send({ error: 'user_not_found' });
 
     reply.send({
