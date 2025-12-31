@@ -1,7 +1,9 @@
 'use strict';
 
-async function findUserByEmail(pg, email) {
-  const { rows } = await pg.query(
+const { pool } = require('../../db');
+
+async function findUserByEmail(email) {
+  const { rows } = await pool.query(
     `SELECT id, email, full_name, lang, is_active
      FROM core.users
      WHERE email = $1`,
@@ -10,8 +12,8 @@ async function findUserByEmail(pg, email) {
   return rows[0] || null;
 }
 
-async function findUserById(pg, userId) {
-  const { rows } = await pg.query(
+async function findUserById(userId) {
+  const { rows } = await pool.query(
     `SELECT id, email, full_name, lang, is_active
      FROM core.users
      WHERE id = $1`,
@@ -20,8 +22,8 @@ async function findUserById(pg, userId) {
   return rows[0] || null;
 }
 
-async function findPassword(pg, userId) {
-  const { rows } = await pg.query(
+async function findPassword(userId) {
+  const { rows } = await pool.query(
     `SELECT password_hash, enabled
      FROM core.user_passwords
      WHERE user_id = $1
@@ -32,8 +34,8 @@ async function findPassword(pg, userId) {
   return rows[0] || null;
 }
 
-async function findRoles(pg, userId) {
-  const { rows } = await pg.query(
+async function findRoles(userId) {
+  const { rows } = await pool.query(
     `SELECT r.id, r.code, r.name_key
      FROM core.user_roles ur
      JOIN core.roles r ON r.id = ur.role_id
@@ -43,8 +45,8 @@ async function findRoles(pg, userId) {
   return rows;
 }
 
-async function findPermissions(pg, userId) {
-  const { rows } = await pg.query(
+async function findPermissions(userId) {
+  const { rows } = await pool.query(
     `SELECT DISTINCT p.code, rp.scope
      FROM core.user_roles ur
      JOIN core.role_permissions rp ON rp.role_id = ur.role_id
@@ -55,8 +57,8 @@ async function findPermissions(pg, userId) {
   return rows;
 }
 
-async function findGroups(pg, userId) {
-  const { rows } = await pg.query(
+async function findGroups(userId) {
+  const { rows } = await pool.query(
     `SELECT g.id, g.code, g.name
      FROM core.user_groups ug
      JOIN core.groups g ON g.id = ug.group_id
