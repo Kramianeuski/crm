@@ -1,11 +1,9 @@
 'use strict';
 
-const pino = require('pino');
-
 function createLogger() {
   const isProd = process.env.CORE_ENV === 'production';
 
-  return pino({
+  return {
     level: isProd ? 'info' : 'debug',
     transport: !isProd
       ? {
@@ -13,7 +11,7 @@ function createLogger() {
           options: { colorize: true }
         }
       : undefined
-  });
+  };
 }
 
 module.exports = { createLogger };
