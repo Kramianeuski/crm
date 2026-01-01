@@ -2,20 +2,13 @@
 
 const fastify = require('fastify');
 const process = require('process');
+const { createLogger } = require('./logging/logger');
 
 function buildApp() {
-  const isProd = process.env.CORE_ENV === 'production';
+  const logger = createLogger();
 
   const app = fastify({
-    logger: {
-      level: isProd ? 'info' : 'debug',
-      transport: !isProd
-        ? {
-            target: 'pino-pretty',
-            options: { colorize: true }
-          }
-        : undefined
-    },
+    logger,
     trustProxy: true,
     disableRequestLogging: false
   });
@@ -38,13 +31,22 @@ function buildApp() {
   app.register(require('./plugins/jwt'));
   app.register(require('./plugins/auth'));
   app.register(require('./plugins/access'));
-  app.register(require('./plugins/audit'));
-  app.register(require('./plugins/error-handler'));
+  app.register(require('./hooks/audit.hook'));
 
   app.register(require('./modules/health/routes'));
   app.register(require('./modules/auth/routes'));
   app.register(require('./modules/access/routes'));
   app.register(require('./modules/settings/routes'));
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(error);
+
+    if (reply.sent) return;
+
+    reply.code(500).send({
+      error: 'internal_server_error'
+    });
+  });
 
   return app;
 }

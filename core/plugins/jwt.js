@@ -16,8 +16,7 @@ module.exports = fp(async function jwtPlugin(fastify) {
   fastify.decorate('verifyJWT', async function verifyJWT(request, reply) {
     const authHeader = request.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      reply.code(401).send({ error: 'unauthorized' });
-      return;
+      return reply.code(401).send({ error: 'unauthorized' });
     }
 
     try {
@@ -32,7 +31,7 @@ module.exports = fp(async function jwtPlugin(fastify) {
       };
     } catch (err) {
       request.log.warn({ err }, 'Invalid JWT');
-      reply.code(401).send({ error: 'unauthorized' });
+      return reply.code(401).send({ error: 'unauthorized' });
     }
   });
 });
