@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 1UUzng2ETq2TZPgF99XvYkK4KQeopALhIi5fW8fLX4bO9HGDEvuSJkvSuqg7zOE
+\restrict XApoc2xa8L9O293xDA8Sul0GLRNLYwUoSu3Obtqf0K0dCrJbOt0eWQQEDaTs6j4
 
 -- Dumped from database version 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)
@@ -172,8 +172,9 @@ COMMENT ON TABLE core.groups IS 'User groups (not roles)';
 
 CREATE TABLE core.languages (
     code text NOT NULL,
-    name text NOT NULL,
-    is_active boolean DEFAULT true NOT NULL
+    title text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -749,5 +750,5 @@ ALTER TABLE ONLY core.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 1UUzng2ETq2TZPgF99XvYkK4KQeopALhIi5fW8fLX4bO9HGDEvuSJkvSuqg7zOE
+\unrestrict XApoc2xa8L9O293xDA8Sul0GLRNLYwUoSu3Obtqf0K0dCrJbOt0eWQQEDaTs6j4
 

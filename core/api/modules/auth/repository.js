@@ -2,10 +2,22 @@
 
 const { pool } = require('../../db');
 
+const USER_SELECT = `
+  SELECT
+    id,
+    email,
+    COALESCE(
+      display_name,
+      trim(concat_ws(' ', first_name, last_name))
+    ) AS display_name,
+    lang,
+    is_active
+  FROM core.users
+`;
+
 async function findUserByEmail(email) {
   const { rows } = await pool.query(
-    `SELECT id, email, full_name, lang, is_active
-     FROM core.users
+    `${USER_SELECT}
      WHERE email = $1`,
     [email.toLowerCase()]
   );
@@ -14,8 +26,7 @@ async function findUserByEmail(email) {
 
 async function findUserById(userId) {
   const { rows } = await pool.query(
-    `SELECT id, email, full_name, lang, is_active
-     FROM core.users
+    `${USER_SELECT}
      WHERE id = $1`,
     [userId]
   );
@@ -24,10 +35,9 @@ async function findUserById(userId) {
 
 async function findPassword(userId) {
   const { rows } = await pool.query(
-    `SELECT password_hash, enabled
+    `SELECT password_hash, is_enabled
      FROM core.user_passwords
      WHERE user_id = $1
-     ORDER BY created_at DESC
      LIMIT 1`,
     [userId]
   );
@@ -59,7 +69,7 @@ async function findPermissions(userId) {
 
 async function findGroups(userId) {
   const { rows } = await pool.query(
-    `SELECT g.id, g.code, g.name
+    `SELECT g.id, g.code, g.name_key
      FROM core.user_groups ug
      JOIN core.groups g ON g.id = ug.group_id
      WHERE ug.user_id = $1`,
