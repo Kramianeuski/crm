@@ -1,4 +1,4 @@
-name: CI
+kname: CI
 
 on:
   push:
@@ -16,9 +16,18 @@ jobs:
           node-version: 18
           cache: pnpm
 
+      # 👇 ВАЖНЫЙ ШАГ
+      - name: Enable Corepack
+        run: corepack enable
+
       - uses: pnpm/action-setup@v4
 
-      - run: pnpm install
+      - name: Install dependencies
+        run: pnpm install
 
-      - run: pnpm --filter core build
-      - run: pnpm --filter ui build
+      - name: Build backend (core)
+        run: pnpm --filter core build
+
+      - name: Build frontend (ui)
+        run: pnpm --filter ui build
+
