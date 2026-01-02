@@ -2,10 +2,13 @@
 
 const fp = require('fastify-plugin');
 
-module.exports = fp(async function authPlugin(fastify) {
-  fastify.decorate('requireAuth', async function requireAuth(request, reply) {
+module.exports = fp(async function authPlugin(app) {
+  app.decorate('requireAuth', async function requireAuth(request) {
     if (!request.user) {
-      return reply.code(401).send({ error: 'unauthorized' });
+      const err = new Error('Unauthorized');
+      err.statusCode = 401;
+      err.code = 'unauthorized';
+      throw err;
     }
   });
 });

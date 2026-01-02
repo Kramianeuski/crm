@@ -4,20 +4,15 @@ const process = require('process');
 const buildApp = require('./app');
 
 const REQUIRED_ENV = [
-  'CORE_ENV',
   'CORE_PORT',
-  'DB_HOST',
-  'DB_PORT',
-  'DB_NAME',
-  'DB_USER',
-  'DB_PASSWORD',
   'JWT_SECRET'
 ];
 
-for (const key of REQUIRED_ENV) {
-  if (!process.env[key]) {
-    console.error(`❌ Missing required env var: ${key}`);
-    process.exit(1);
+function validateEnv() {
+  for (const key of REQUIRED_ENV) {
+    if (!process.env[key]) {
+      throw new Error(`Missing required env var: ${key}`);
+    }
   }
 }
 
@@ -27,14 +22,12 @@ let isShuttingDown = false;
 const shutdown = async signal => {
   if (isShuttingDown) return;
   isShuttingDown = true;
-  app.log.info({ signal }, 'Shutting down CRM Core');
 
+  app.log.info({ signal }, 'Shutting down CRM Core');
   try {
     await app.close();
-    process.exit(0);
   } catch (err) {
     app.log.error(err, 'Shutdown error');
-    process.exit(1);
   }
 };
 
@@ -43,11 +36,12 @@ process.on('SIGINT', shutdown);
 
 const start = async () => {
   try {
+    validateEnv();
     const port = Number(process.env.CORE_PORT);
-    await app.listen({ port, host: '127.0.0.1' });
-    app.log.info({ port, env: process.env.CORE_ENV }, 'CRM Core API started');
+    await app.listen({ port, host: '0.0.0.0' });
+    app.log.info({ port, env: process.env.NODE_ENV }, 'CRM Core API started');
   } catch (err) {
-    app.log.error(err, 'Startup failed');
+    console.error(err.message);
     process.exit(1);
   }
 };

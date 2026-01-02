@@ -1,0 +1,9 @@
+{
+  "name": "@crm/core",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node -c server.js",
+    "start": "node server.js"
+  }
+}
