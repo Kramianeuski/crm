@@ -4,3 +4,8 @@ ui/dist
 .DS_Store
 npm-debug.log*
 pnpm-debug.log*
+.env
+.env.*
+.pgpass
+node_modules/
+node_modules/
