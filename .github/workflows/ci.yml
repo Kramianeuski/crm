@@ -16,7 +16,6 @@ jobs:
           node-version: 18
           cache: pnpm
 
-      # 👇 ВАЖНЫЙ ШАГ
       - name: Enable Corepack
         run: corepack enable
 
