@@ -1,10 +1,19 @@
-'use strict';
+import dotenv from 'dotenv';
+
+const envResult = dotenv.config({ path: '/etc/crm/core.env' });
+if (envResult.error) {
+  throw envResult.error;
+}
 
 import process from 'process';
-import buildApp from './app.js';
 
 const REQUIRED_ENV = [
   'CORE_PORT',
+  'DB_HOST',
+  'DB_PORT',
+  'DB_NAME',
+  'DB_USER',
+  'DB_PASSWORD',
   'JWT_SECRET'
 ];
 
@@ -14,7 +23,21 @@ function validateEnv() {
       throw new Error(`Missing required env var: ${key}`);
     }
   }
+
+  const port = Number(process.env.CORE_PORT);
+  if (Number.isNaN(port)) {
+    throw new Error('CORE_PORT must be a number');
+  }
+
+  const dbPort = Number(process.env.DB_PORT);
+  if (Number.isNaN(dbPort)) {
+    throw new Error('DB_PORT must be a number');
+  }
 }
+
+validateEnv();
+
+const { default: buildApp } = await import('./app.js');
 
 const app = buildApp();
 let isShuttingDown = false;
@@ -36,13 +59,7 @@ process.on('SIGINT', shutdown);
 
 const start = async () => {
   try {
-    validateEnv();
-
     const port = Number(process.env.CORE_PORT);
-    if (Number.isNaN(port)) {
-      throw new Error('CORE_PORT must be a number');
-    }
-
     await app.listen({ port, host: '0.0.0.0' });
     app.log.info(
       { port, env: process.env.NODE_ENV },

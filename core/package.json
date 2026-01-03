@@ -2,6 +2,9 @@
   "name": "@crm/core",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
   "scripts": {
     "build": "node -c server.js",
     "start": "node server.js"
