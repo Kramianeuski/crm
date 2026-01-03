@@ -1,6 +1,4 @@
-'use strict';
-
-function createLogger() {
+export function createLogger() {
   const isProd = process.env.CORE_ENV === 'production';
 
   return {
@@ -13,5 +11,3 @@ function createLogger() {
       : undefined
   };
 }
-
-module.exports = { createLogger };

@@ -1,5 +1,3 @@
-'use strict';
-
 const AUDIT_SCHEMA_SQL = `
   CREATE SCHEMA IF NOT EXISTS audit;
 
@@ -11,7 +9,7 @@ const AUDIT_SCHEMA_SQL = `
   );
 `;
 
-async function ensureAuditStructures(db, logger) {
+export async function ensureAuditStructures(db, logger) {
   try {
     await db.query(AUDIT_SCHEMA_SQL);
   } catch (err) {
@@ -19,7 +17,7 @@ async function ensureAuditStructures(db, logger) {
   }
 }
 
-async function insertAuditLog(db, entry, logger) {
+export async function insertAuditLog(db, entry, logger) {
   try {
     await db.query(
       `INSERT INTO audit.audit_log (event, payload)
@@ -30,8 +28,3 @@ async function insertAuditLog(db, entry, logger) {
     logger.warn(err, 'Audit log failed');
   }
 }
-
-module.exports = {
-  ensureAuditStructures,
-  insertAuditLog
-};

@@ -1,7 +1,5 @@
-'use strict';
-
-const fp = require('fastify-plugin');
-const jwt = require('jsonwebtoken');
+import fp from 'fastify-plugin';
+import jwt from 'jsonwebtoken';
 
 function validateJwtEnv() {
   if (!process.env.JWT_SECRET) {
@@ -9,7 +7,7 @@ function validateJwtEnv() {
   }
 }
 
-module.exports = fp(async function jwtPlugin(app) {
+export default fp(async function jwtPlugin(app) {
   validateJwtEnv();
 
   const JWT_SECRET = process.env.JWT_SECRET;
@@ -17,7 +15,7 @@ module.exports = fp(async function jwtPlugin(app) {
   const JWT_ISSUER = process.env.JWT_ISSUER || 'crm-core';
   const JWT_AUDIENCE = process.env.JWT_AUDIENCE || 'crm-ui';
 
-  app.decorate('signAccessToken', payload => {
+  app.decorate('signToken', payload => {
     return jwt.sign(
       payload,
       JWT_SECRET,

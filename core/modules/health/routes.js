@@ -1,6 +1,4 @@
-'use strict';
-
-module.exports = async function healthRoutes(fastify) {
+export default async function healthRoutes(fastify) {
   fastify.get('/api/v1/core/health', async () => ({
     status: 'ok',
     service: 'crm-core',
@@ -12,4 +10,4 @@ module.exports = async function healthRoutes(fastify) {
     await fastify.pg.query('select 1');
     return { ready: true };
   });
-};
+}

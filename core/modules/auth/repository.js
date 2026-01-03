@@ -1,6 +1,4 @@
-'use strict';
-
-const { pool } = require('../../db');
+import { pool } from '../../db.js';
 
 const USER_SELECT = `
   SELECT
@@ -15,7 +13,7 @@ const USER_SELECT = `
   FROM core.users
 `;
 
-async function findUserByEmail(email) {
+export async function findUserByEmail(email) {
   const { rows } = await pool.query(
     `${USER_SELECT}
      WHERE email = $1`,
@@ -24,7 +22,7 @@ async function findUserByEmail(email) {
   return rows[0] || null;
 }
 
-async function findUserById(userId) {
+export async function findUserById(userId) {
   const { rows } = await pool.query(
     `${USER_SELECT}
      WHERE id = $1`,
@@ -33,7 +31,7 @@ async function findUserById(userId) {
   return rows[0] || null;
 }
 
-async function findPassword(userId) {
+export async function findPassword(userId) {
   const { rows } = await pool.query(
     `SELECT password_hash, is_enabled
      FROM core.user_passwords
@@ -44,7 +42,7 @@ async function findPassword(userId) {
   return rows[0] || null;
 }
 
-async function findRoles(userId) {
+export async function findRoles(userId) {
   const { rows } = await pool.query(
     `SELECT r.id, r.code, r.name_key
      FROM core.user_roles ur
@@ -55,7 +53,7 @@ async function findRoles(userId) {
   return rows;
 }
 
-async function findPermissions(userId) {
+export async function findPermissions(userId) {
   const { rows } = await pool.query(
     `SELECT DISTINCT p.code, rp.scope
      FROM core.user_roles ur
@@ -67,7 +65,7 @@ async function findPermissions(userId) {
   return rows;
 }
 
-async function findGroups(userId) {
+export async function findGroups(userId) {
   const { rows } = await pool.query(
     `SELECT g.id, g.code, g.name_key
      FROM core.user_groups ug
@@ -77,12 +75,3 @@ async function findGroups(userId) {
   );
   return rows;
 }
-
-module.exports = {
-  findUserByEmail,
-  findUserById,
-  findPassword,
-  findRoles,
-  findPermissions,
-  findGroups
-};

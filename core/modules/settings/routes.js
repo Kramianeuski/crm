@@ -1,8 +1,13 @@
-'use strict';
+import {
+  fetchModules,
+  fetchPages,
+  findModule,
+  findPage,
+  readValue,
+  saveValue
+} from './repository.js';
 
-const repo = require('./repository');
-
-module.exports = async function settingsRoutes(fastify) {
+export default async function settingsRoutes(fastify) {
   const splitPermissionCode = permissionCode => {
     const parts = permissionCode.split('.');
     const action = parts.pop();
@@ -11,11 +16,11 @@ module.exports = async function settingsRoutes(fastify) {
 
   fastify.get('/api/core/v1/settings/modules', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
-      const modules = await repo.fetchModules(fastify.pg);
+      const modules = await fetchModules(fastify.pg);
       const result = [];
 
       for (const module of modules) {
-        const pages = await repo.fetchPages(fastify.pg, module.id);
+        const pages = await fetchPages(fastify.pg, module.id);
         const allowedPages = [];
 
         for (const page of pages) {
@@ -51,10 +56,10 @@ module.exports = async function settingsRoutes(fastify) {
   fastify.get('/api/core/v1/settings/schema/:module/:page', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
       const { module, page } = request.params;
-      const moduleRow = await repo.findModule(fastify.pg, module);
+      const moduleRow = await findModule(fastify.pg, module);
       if (!moduleRow) return reply.code(404).send({ error: 'module_not_found' });
 
-      const pageRow = await repo.findPage(fastify.pg, moduleRow.id, page);
+      const pageRow = await findPage(fastify.pg, moduleRow.id, page);
       if (!pageRow) return reply.code(404).send({ error: 'page_not_found' });
 
       const permissionCode = pageRow.permission_code;
@@ -83,10 +88,10 @@ module.exports = async function settingsRoutes(fastify) {
         const { module, page } = request.params;
         const payload = request.body || {};
 
-        const moduleRow = await repo.findModule(fastify.pg, module);
+        const moduleRow = await findModule(fastify.pg, module);
         if (!moduleRow) return reply.code(404).send({ error: 'module_not_found' });
 
-        const pageRow = await repo.findPage(fastify.pg, moduleRow.id, page);
+        const pageRow = await findPage(fastify.pg, moduleRow.id, page);
         if (!pageRow) return reply.code(404).send({ error: 'page_not_found' });
 
         const permissionCode = pageRow.permission_code;
@@ -94,10 +99,10 @@ module.exports = async function settingsRoutes(fastify) {
         const allowed = await fastify.canAccess(request.user, resource, action);
         if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
-        const beforeValue = await repo.readValue(fastify.pg, module, page);
+        const beforeValue = await readValue(fastify.pg, module, page);
         if (request.auditContext) request.auditContext.before = beforeValue;
 
-        await repo.saveValue(fastify.pg, module, page, payload, request.user.id);
+        await saveValue(fastify.pg, module, page, payload, request.user.id);
 
         if (request.auditContext) request.auditContext.after = { saved: true };
 
@@ -108,4 +113,4 @@ module.exports = async function settingsRoutes(fastify) {
       }
     }
   );
-};
+}

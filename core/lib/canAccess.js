@@ -1,10 +1,8 @@
-'use strict';
-
-function mapPermissionCode(resource, action) {
+export function mapPermissionCode(resource, action) {
   return `${resource}.${action}`;
 }
 
-async function resolveScope(pg, userId, resource, action) {
+export async function resolveScope(pg, userId, resource, action) {
   const permissionCode = mapPermissionCode(resource, action);
 
   const { rows: direct } = await pg.query(
@@ -33,7 +31,7 @@ async function resolveScope(pg, userId, resource, action) {
   return 'none';
 }
 
-async function isInDepartment(pg, userId, departmentId) {
+export async function isInDepartment(pg, userId, departmentId) {
   if (!departmentId) return false;
   const { rows } = await pg.query(
     `WITH RECURSIVE dept_tree AS (
@@ -55,7 +53,7 @@ async function isInDepartment(pg, userId, departmentId) {
   return rows.length > 0;
 }
 
-async function getPolicies(pg, userId, resource, action) {
+export async function getPolicies(pg, userId, resource, action) {
   const { rows: groupIds } = await pg.query(
     `SELECT group_id FROM core.user_groups WHERE user_id = $1`,
     [userId]
@@ -100,7 +98,7 @@ function matches(conditions, entity) {
   });
 }
 
-async function canAccess(pg, user, resource, action, entity = null) {
+export async function canAccess(pg, user, resource, action, entity = null) {
   const scope = await resolveScope(pg, user.id, resource, action);
   if (scope === 'none') return false;
 
@@ -123,11 +121,3 @@ async function canAccess(pg, user, resource, action, entity = null) {
 
   return true;
 }
-
-module.exports = {
-  canAccess,
-  mapPermissionCode,
-  resolveScope,
-  isInDepartment,
-  getPolicies
-};

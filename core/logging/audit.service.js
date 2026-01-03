@@ -1,8 +1,6 @@
-'use strict';
+import { ensureAuditStructures, insertAuditLog } from './audit.repository.js';
 
-const { ensureAuditStructures, insertAuditLog } = require('./audit.repository');
-
-function createAuditService(db, logger) {
+export function createAuditService(db, logger) {
   ensureAuditStructures(db, logger);
 
   return {
@@ -17,7 +15,3 @@ function createAuditService(db, logger) {
     }
   };
 }
-
-module.exports = {
-  createAuditService
-};

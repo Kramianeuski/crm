@@ -1,11 +1,17 @@
-'use strict';
+import {
+  ensureKey,
+  getDefaultLanguage,
+  listLanguages,
+  loadTranslations,
+  updateLanguage,
+  upsertLanguage,
+  upsertTranslations
+} from './repository.js';
 
-const repo = require('./repository');
-
-module.exports = async function i18nRoutes(fastify) {
+export default async function i18nRoutes(fastify) {
   fastify.get('/api/core/v1/i18n/languages', async (request, reply) => {
-    const languages = await repo.listLanguages(fastify.pg);
-    const defaultLanguage = await repo.getDefaultLanguage(fastify.pg);
+    const languages = await listLanguages(fastify.pg);
+    const defaultLanguage = await getDefaultLanguage(fastify.pg);
     return reply.send({ languages, defaultLanguage });
   });
 
@@ -13,22 +19,22 @@ module.exports = async function i18nRoutes(fastify) {
     const { code, name, is_active, is_default } = request.body || {};
     if (!code || !name) return reply.code(400).send({ error: 'invalid_request' });
 
-    const language = await repo.upsertLanguage(fastify.pg, { code, name, is_active, is_default });
+    const language = await upsertLanguage(fastify.pg, { code, name, is_active, is_default });
     return reply.code(201).send({ language });
   });
 
   fastify.patch('/api/core/v1/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     const { code } = request.params;
     const { name, is_active, is_default } = request.body || {};
-    const updated = await repo.updateLanguage(fastify.pg, code, { name, is_active, is_default });
+    const updated = await updateLanguage(fastify.pg, code, { name, is_active, is_default });
     if (!updated) return reply.code(404).send({ error: 'language_not_found' });
     return reply.send({ language: updated });
   });
 
   fastify.get('/api/core/v1/i18n/translations', async (request, reply) => {
-    const languages = await repo.listLanguages(fastify.pg);
-    const defaultLanguage = await repo.getDefaultLanguage(fastify.pg);
-    const translations = await repo.loadTranslations(fastify.pg);
+    const languages = await listLanguages(fastify.pg);
+    const defaultLanguage = await getDefaultLanguage(fastify.pg);
+    const translations = await loadTranslations(fastify.pg);
     return reply.send({ languages, defaultLanguage, translations });
   });
 
@@ -36,7 +42,7 @@ module.exports = async function i18nRoutes(fastify) {
     const { key, description } = request.body || {};
     if (!key) return reply.code(400).send({ error: 'invalid_request' });
 
-    await repo.ensureKey(fastify.pg, key, description || null);
+    await ensureKey(fastify.pg, key, description || null);
     return reply.code(201).send({ key });
   });
 
@@ -46,7 +52,7 @@ module.exports = async function i18nRoutes(fastify) {
       return reply.code(400).send({ error: 'invalid_request' });
     }
 
-    await repo.upsertTranslations(fastify.pg, key, translations);
+    await upsertTranslations(fastify.pg, key, translations);
     return reply.code(201).send({ saved: true });
   });
-};
+}
