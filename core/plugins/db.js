@@ -1,19 +1,17 @@
-'use strict';
+import fp from 'fastify-plugin';
+import { pool } from '../db.js';
 
-const fp = require('fastify-plugin');
-const { pool } = require('../db');
-
-module.exports = fp(async function dbPlugin(fastify) {
+export default fp(async function dbPlugin(app) {
   try {
     await pool.query('select 1');
   } catch (err) {
-    fastify.log.error(err, 'PostgreSQL connection failed');
+    app.log.error(err, 'PostgreSQL connection failed');
     throw err;
   }
 
-  fastify.decorate('pg', pool);
+  app.decorate('pg', pool);
 
-  fastify.addHook('onClose', async () => {
+  app.addHook('onClose', async () => {
     await pool.end();
   });
 });

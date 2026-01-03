@@ -1,5 +1,3 @@
-'use strict';
-
 const BULL_SCHEMA_SQL = `
   CREATE SCHEMA IF NOT EXISTS bull;
 
@@ -19,7 +17,7 @@ async function ensureBullStructures(db, logger) {
   }
 }
 
-function createSystemService(db, logger) {
+export function createSystemService(db, logger) {
   ensureBullStructures(db, logger);
 
   return {
@@ -38,7 +36,3 @@ function createSystemService(db, logger) {
     }
   };
 }
-
-module.exports = {
-  createSystemService
-};

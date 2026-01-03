@@ -1,11 +1,9 @@
-'use strict';
-
 import fp from 'fastify-plugin';
 import { canAccess } from '../lib/canAccess.js';
 
 export default fp(async function accessPlugin(app) {
   app.decorate('canAccess', async (user, resource, action, entity = null) => {
-    return canAccess(app.db, user, resource, action, entity);
+    return canAccess(app.pg, user, resource, action, entity);
   });
 
   app.decorate(

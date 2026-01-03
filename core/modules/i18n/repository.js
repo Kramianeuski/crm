@@ -1,6 +1,4 @@
-'use strict';
-
-async function listLanguages(pg) {
+export async function listLanguages(pg) {
   const { rows } = await pg.query(
     `SELECT code, name, is_active, is_default
      FROM core.languages
@@ -9,7 +7,7 @@ async function listLanguages(pg) {
   return rows;
 }
 
-async function upsertLanguage(pg, language) {
+export async function upsertLanguage(pg, language) {
   const client = await pg.connect();
 
   try {
@@ -40,7 +38,7 @@ async function upsertLanguage(pg, language) {
   }
 }
 
-async function updateLanguage(pg, code, patch) {
+export async function updateLanguage(pg, code, patch) {
   const client = await pg.connect();
 
   try {
@@ -70,7 +68,7 @@ async function updateLanguage(pg, code, patch) {
   }
 }
 
-async function ensureKey(pg, key, description = null) {
+export async function ensureKey(pg, key, description = null) {
   await pg.query(
     `INSERT INTO core.i18n_keys (key, description)
      VALUES ($1, $2)
@@ -80,7 +78,7 @@ async function ensureKey(pg, key, description = null) {
   );
 }
 
-async function upsertTranslations(pg, key, translations) {
+export async function upsertTranslations(pg, key, translations) {
   const client = await pg.connect();
 
   try {
@@ -109,7 +107,7 @@ async function upsertTranslations(pg, key, translations) {
   }
 }
 
-async function loadTranslations(pg) {
+export async function loadTranslations(pg) {
   const { rows } = await pg.query(
     `SELECT t.key, t.language_code, t.value
      FROM core.i18n_translations t
@@ -124,19 +122,9 @@ async function loadTranslations(pg) {
   return map;
 }
 
-async function getDefaultLanguage(pg) {
+export async function getDefaultLanguage(pg) {
   const { rows } = await pg.query(
     `SELECT code FROM core.languages WHERE is_default = true LIMIT 1`
   );
   return rows[0]?.code || null;
 }
-
-module.exports = {
-  listLanguages,
-  upsertLanguage,
-  updateLanguage,
-  ensureKey,
-  upsertTranslations,
-  loadTranslations,
-  getDefaultLanguage
-};

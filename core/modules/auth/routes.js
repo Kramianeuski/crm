@@ -1,8 +1,6 @@
-'use strict';
+import { authenticate, buildUserContext } from './service.js';
 
-const service = require('./service');
-
-module.exports = async function authRoutes(fastify) {
+export default async function authRoutes(fastify) {
   fastify.post('/api/core/v1/auth/login', async (request, reply) => {
     try {
       const { email, password } = request.body || {};
@@ -10,7 +8,7 @@ module.exports = async function authRoutes(fastify) {
         return reply.code(400).send({ error: 'invalid_request' });
       }
 
-      const result = await service.authenticate(email, password);
+      const result = await authenticate(email, password);
       if (result.error) {
         return reply
           .code(result.error === 'invalid_credentials' ? 401 : 403)
@@ -34,7 +32,7 @@ module.exports = async function authRoutes(fastify) {
 
   fastify.get('/api/core/v1/auth/me', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
-      const ctx = await service.buildUserContext(request.user.id);
+      const ctx = await buildUserContext(request.user.id);
       if (!ctx) return reply.code(404).send({ error: 'user_not_found' });
 
       return reply.send({
@@ -48,4 +46,4 @@ module.exports = async function authRoutes(fastify) {
       return reply.code(500).send({ error: 'internal_error' });
     }
   });
-};
+}

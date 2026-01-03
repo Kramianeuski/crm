@@ -1,6 +1,4 @@
-'use strict';
-
-module.exports = async function accessRoutes(fastify) {
+export default async function accessRoutes(fastify) {
   fastify.post('/api/core/v1/access/check', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
       const { resource, action, entity } = request.body || {};
@@ -13,4 +11,4 @@ module.exports = async function accessRoutes(fastify) {
       return reply.code(500).send({ error: 'internal_error' });
     }
   });
-};
+}

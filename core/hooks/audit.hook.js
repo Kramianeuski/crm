@@ -1,17 +1,14 @@
-'use strict';
+import { createAuditService } from '../logging/audit.service.js';
+import { createSystemService } from '../logging/system.service.js';
 
-const fp = require('fastify-plugin');
-const { createAuditService } = require('../logging/audit.service');
-const { createSystemService } = require('../logging/system.service');
+export default async function auditHook(app) {
+  const auditService = createAuditService(app.pg, app.log);
+  const systemService = createSystemService(app.pg, app.log);
 
-module.exports = fp(async function auditHook(fastify) {
-  const auditService = createAuditService(fastify.pg, fastify.log);
-  const systemService = createSystemService(fastify.pg, fastify.log);
+  app.decorate('audit', auditService);
+  app.decorate('systemLog', systemService);
 
-  fastify.decorate('audit', auditService);
-  fastify.decorate('systemLog', systemService);
-
-  fastify.addHook('onRequest', async request => {
+  app.addHook('onRequest', async request => {
     request.auditContext = {
       startedAt: Date.now(),
       before: request.body ?? null,
@@ -19,7 +16,7 @@ module.exports = fp(async function auditHook(fastify) {
     };
   });
 
-  fastify.addHook('onSend', async (request, reply, payload) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     const route = request.routerPath || request.raw.url;
     const durationMs = Date.now() - (request.auditContext?.startedAt || Date.now());
 
@@ -54,4 +51,4 @@ module.exports = fp(async function auditHook(fastify) {
       });
     }
   });
-});
+}
