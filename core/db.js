@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 function validateDbEnv() {
   const required = [
     'DB_HOST',
+    'DB_PORT',
     'DB_NAME',
     'DB_USER',
     'DB_PASSWORD'
@@ -13,13 +14,20 @@ function validateDbEnv() {
       throw new Error(`Missing required DB env var: ${key}`);
     }
   }
+
+  const dbPort = Number(process.env.DB_PORT);
+  if (Number.isNaN(dbPort)) {
+    throw new Error('DB_PORT must be a number');
+  }
 }
 
 validateDbEnv();
 
+const dbPort = Number(process.env.DB_PORT);
+
 export const pool = new Pool({
   host: process.env.DB_HOST,
-  port: Number(process.env.DB_PORT || 5432),
+  port: dbPort,
   database: process.env.DB_NAME,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
