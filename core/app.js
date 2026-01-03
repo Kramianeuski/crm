@@ -70,6 +70,7 @@ function buildApp() {
   app.register(require('./modules/auth/routes'), { prefix: '/api' });
   app.register(require('./modules/access/routes'), { prefix: '/api' });
   app.register(require('./modules/settings/routes'), { prefix: '/api' });
+  app.register(require('./modules/i18n/routes'), { prefix: '/api' });
 
   /* =========================
    * Global error handler

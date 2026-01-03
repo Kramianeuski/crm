@@ -5,6 +5,7 @@ import Shell from '../layout/Shell';
 import Login from '../pages/Login';
 import Settings from '../pages/Settings';
 import { User, fetchCurrentUser, tokenStore } from './api';
+import { I18nProvider, useI18n } from './i18n';
 
 export type AuthContextValue = {
   user: User | null;
@@ -60,12 +61,36 @@ export default function App() {
     [user]
   );
 
-  if (booting) {
+  return (
+    <I18nProvider userLanguage={user?.lang}>
+      <AppContent
+        booting={booting}
+        onAuthenticated={() => navigate('/settings', { replace: true })}
+        onLogout={handleLogout}
+        contextValue={contextValue}
+        user={user}
+      />
+    </I18nProvider>
+  );
+}
+
+type AppContentProps = {
+  booting: boolean;
+  onAuthenticated: () => void;
+  onLogout: () => void;
+  contextValue: AuthContextValue;
+  user: User | null;
+};
+
+function AppContent({ booting, onAuthenticated, onLogout, contextValue, user }: AppContentProps) {
+  const { t, loading: i18nLoading } = useI18n();
+
+  if (booting || i18nLoading) {
     return (
       <div className="page page-centered">
         <div className="card">
           <div className="loading-dot" />
-          <p className="muted">Загрузка...</p>
+          <p className="muted">{t('app_loading')}</p>
         </div>
       </div>
     );
@@ -74,9 +99,9 @@ export default function App() {
   return (
     <AuthContext.Provider value={contextValue}>
       <Routes>
-        <Route path="/login" element={<Login onAuthenticated={() => navigate('/settings', { replace: true })} />} />
-        <Route element={<AuthGuard user={user} onLogout={handleLogout} />}>
-          <Route element={<Shell user={user} onLogout={handleLogout} />}>
+        <Route path="/login" element={<Login onAuthenticated={onAuthenticated} />} />
+        <Route element={<AuthGuard user={user} onLogout={onLogout} />}>
+          <Route element={<Shell user={user} onLogout={onLogout} />}>
             <Route path="/settings" element={<Settings />} />
             <Route path="/" element={<Navigate to="/settings" replace />} />
           </Route>
