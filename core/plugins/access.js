@@ -1,9 +1,9 @@
 'use strict';
 
-const fp = require('fastify-plugin');
-const { canAccess } = require('../lib/canAccess');
+import fp from 'fastify-plugin';
+import { canAccess } from '../lib/canAccess.js';
 
-module.exports = fp(async function accessPlugin(app) {
+export default fp(async function accessPlugin(app) {
   app.decorate('canAccess', async (user, resource, action, entity = null) => {
     return canAccess(app.db, user, resource, action, entity);
   });

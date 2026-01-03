@@ -1,13 +1,31 @@
 'use strict';
 
-const fastify = require('fastify');
-const process = require('process');
-const { createLogger } = require('./logging/logger');
+import Fastify from 'fastify';
+import process from 'process';
 
-function buildApp() {
+import { createLogger } from './logging/logger.js';
+
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import cors from '@fastify/cors';
+
+import dbPlugin from './plugins/db.js';
+import jwtPlugin from './plugins/jwt.js';
+import authPlugin from './plugins/auth.js';
+import accessPlugin from './plugins/access.js';
+
+import auditHook from './hooks/audit.hook.js';
+
+import healthRoutes from './modules/health/routes.js';
+import authRoutes from './modules/auth/routes.js';
+import accessRoutes from './modules/access/routes.js';
+import settingsRoutes from './modules/settings/routes.js';
+import i18nRoutes from './modules/i18n/routes.js';
+
+export default function buildApp() {
   const logger = createLogger();
 
-  const app = fastify({
+  const app = Fastify({
     logger,
     trustProxy: process.env.TRUST_PROXY === 'true',
     disableRequestLogging: process.env.NODE_ENV === 'production'
@@ -17,20 +35,20 @@ function buildApp() {
    * Security & platform
    * ========================= */
 
-  app.register(require('@fastify/helmet'), {
+  app.register(helmet, {
     global: true,
     contentSecurityPolicy: false
   });
 
-  app.register(require('@fastify/rate-limit'), {
+  app.register(rateLimit, {
     max: 1000,
     timeWindow: '1 minute',
     keyGenerator: req => req.user?.id ?? req.ip
   });
 
-  app.register(require('@fastify/cors'), {
+  app.register(cors, {
     origin: (origin, cb) => {
-      if (!origin) return cb(null, true); // server-to-server / curl
+      if (!origin) return cb(null, true);
 
       const allowedOrigins = (process.env.CORS_ORIGIN || '')
         .split(',')
@@ -43,34 +61,29 @@ function buildApp() {
 
   /* =========================
    * Core plugins
-   * Order is IMPORTANT:
-   * jwt → auth → access
    * ========================= */
 
-  app.register(require('./plugins/db'));
-  app.register(require('./plugins/jwt'));
-  app.register(require('./plugins/auth'));
-  app.register(require('./plugins/access'));
+  app.register(dbPlugin);
+  app.register(jwtPlugin);
+  app.register(authPlugin);
+  app.register(accessPlugin);
 
   /* =========================
    * Hooks
    * ========================= */
 
-  app.register(require('./hooks/audit.hook'));
+  app.register(auditHook);
 
   /* =========================
    * Routes
    * ========================= */
 
-  // Health must be public and lightweight
-  app.register(require('./modules/health/routes'), {
-    logLevel: 'silent'
-  });
+  app.register(healthRoutes, { logLevel: 'silent' });
 
-  app.register(require('./modules/auth/routes'), { prefix: '/api' });
-  app.register(require('./modules/access/routes'), { prefix: '/api' });
-  app.register(require('./modules/settings/routes'), { prefix: '/api' });
-  app.register(require('./modules/i18n/routes'), { prefix: '/api' });
+  app.register(authRoutes, { prefix: '/api' });
+  app.register(accessRoutes, { prefix: '/api' });
+  app.register(settingsRoutes, { prefix: '/api' });
+  app.register(i18nRoutes, { prefix: '/api' });
 
   /* =========================
    * Global error handler
@@ -90,5 +103,3 @@ function buildApp() {
 
   return app;
 }
-
-module.exports = buildApp;

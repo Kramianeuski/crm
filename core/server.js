@@ -1,7 +1,7 @@
 'use strict';
 
-const process = require('process');
-const buildApp = require('./app');
+import process from 'process';
+import buildApp from './app.js';
 
 const REQUIRED_ENV = [
   'CORE_PORT',
@@ -19,7 +19,7 @@ function validateEnv() {
 const app = buildApp();
 let isShuttingDown = false;
 
-const shutdown = async signal => {
+const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
@@ -37,9 +37,17 @@ process.on('SIGINT', shutdown);
 const start = async () => {
   try {
     validateEnv();
+
     const port = Number(process.env.CORE_PORT);
+    if (Number.isNaN(port)) {
+      throw new Error('CORE_PORT must be a number');
+    }
+
     await app.listen({ port, host: '0.0.0.0' });
-    app.log.info({ port, env: process.env.NODE_ENV }, 'CRM Core API started');
+    app.log.info(
+      { port, env: process.env.NODE_ENV },
+      'CRM Core API started'
+    );
   } catch (err) {
     console.error(err.message);
     process.exit(1);
