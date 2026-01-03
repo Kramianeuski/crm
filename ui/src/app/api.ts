@@ -10,6 +10,19 @@ export type User = {
   permissions: string[];
 };
 
+export type Language = {
+  code: string;
+  name: string;
+  is_active: boolean;
+  is_default: boolean;
+};
+
+export type TranslationsResponse = {
+  languages: Language[];
+  defaultLanguage: string;
+  translations: Record<string, Record<string, string>>;
+};
+
 type MeResponse = {
   user: {
     id: number | string;
@@ -94,7 +107,10 @@ async function apiFetch<T>(
       typeof payload === 'string'
         ? payload || 'Request failed'
         : payload?.error || payload?.message || 'Request failed';
-    throw new Error(message);
+    const error = new Error(message);
+    // @ts-expect-error - propagate backend error key for i18n
+    error.code = typeof payload === 'object' && payload ? payload.error || null : null;
+    throw error;
   }
 
   return (payload ?? {}) as T;
@@ -128,4 +144,47 @@ export async function fetchCurrentUser(): Promise<User> {
     roles: data.roles.map((r) => r.code),
     permissions: data.permissions
   };
+}
+
+/* ===============================
+   I18n API
+   =============================== */
+
+export async function fetchTranslationsBundle(): Promise<TranslationsResponse> {
+  return apiFetch<TranslationsResponse>('/core/v1/i18n/translations');
+}
+
+export async function createLanguage(payload: {
+  code: string;
+  name: string;
+  is_active?: boolean;
+  is_default?: boolean;
+}): Promise<Language> {
+  const { language } = await apiFetch<{ language: Language }>('/core/v1/i18n/languages', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return language;
+}
+
+export async function updateLanguage(code: string, payload: Partial<Language>): Promise<Language> {
+  const { language } = await apiFetch<{ language: Language }>(`/core/v1/i18n/languages/${code}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+  return language;
+}
+
+export async function registerKey(key: string, description?: string): Promise<void> {
+  await apiFetch('/core/v1/i18n/keys', {
+    method: 'POST',
+    body: JSON.stringify({ key, description })
+  });
+}
+
+export async function upsertTranslation(payload: { key: string; translations: Record<string, string> }): Promise<void> {
+  await apiFetch('/core/v1/i18n/translations', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
 }

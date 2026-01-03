@@ -1,17 +1,12 @@
 import { FormEvent, useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../app/App';
+import { Language, createLanguage, updateLanguage } from '../app/api';
+import { useI18n } from '../app/i18n';
 
 type NavItem = {
   key: string;
-  label: string;
+  labelKey: string;
   permission: string;
-};
-
-type Language = {
-  code: string;
-  name: string;
-  enabled: boolean;
-  isDefault?: boolean;
 };
 
 type UserRow = {
@@ -28,15 +23,15 @@ type UserRow = {
 
 type RoleRow = {
   code: string;
-  name: string;
+  nameKey: string;
   scope: 'none' | 'own' | 'department' | 'all';
   permissions: string[];
 };
 
 type AccessPolicy = {
   id: string;
-  description: string;
-  appliesTo: string;
+  descriptionKey: string;
+  appliesToKey: string;
 };
 
 type AuditLog = {
@@ -49,17 +44,11 @@ type AuditLog = {
 };
 
 const navItems: NavItem[] = [
-  { key: 'system', label: 'System', permission: 'system.manage' },
-  { key: 'users', label: 'Users', permission: 'users.manage' },
-  { key: 'roles', label: 'Roles & Access', permission: 'roles.manage' },
-  { key: 'languages', label: 'Languages', permission: 'languages.manage' },
-  { key: 'audit', label: 'Audit Logs', permission: 'audit.view' }
-];
-
-const languages: Language[] = [
-  { code: 'en', name: 'English', enabled: true, isDefault: true },
-  { code: 'ru', name: 'Русский', enabled: true },
-  { code: 'de', name: 'Deutsch', enabled: false }
+  { key: 'system', labelKey: 'settings_nav_system', permission: 'system.manage' },
+  { key: 'users', labelKey: 'settings_nav_users', permission: 'users.manage' },
+  { key: 'roles', labelKey: 'settings_nav_roles', permission: 'roles.manage' },
+  { key: 'languages', labelKey: 'settings_nav_languages', permission: 'languages.manage' },
+  { key: 'audit', labelKey: 'settings_nav_audit', permission: 'audit.view' }
 ];
 
 const users: UserRow[] = [
@@ -101,19 +90,19 @@ const users: UserRow[] = [
 const roles: RoleRow[] = [
   {
     code: 'owner',
-    name: 'Owner',
+    nameKey: 'roles_owner_name',
     scope: 'all',
     permissions: ['settings.view', 'system.manage', 'roles.manage', 'users.manage', 'languages.manage', 'audit.view']
   },
   {
     code: 'manager',
-    name: 'Department manager',
+    nameKey: 'roles_manager_name',
     scope: 'department',
     permissions: ['settings.view', 'users.manage', 'audit.view']
   },
   {
     code: 'viewer',
-    name: 'Read only',
+    nameKey: 'roles_viewer_name',
     scope: 'own',
     permissions: ['settings.view', 'audit.view']
   }
@@ -122,13 +111,13 @@ const roles: RoleRow[] = [
 const policies: AccessPolicy[] = [
   {
     id: 'policy-1',
-    description: 'Менеджеры видят все сделки департамента, кроме контрагента X',
-    appliesTo: 'sales'
+    descriptionKey: 'policies_invite_only_managers',
+    appliesToKey: 'settings_users_title'
   },
   {
     id: 'policy-2',
-    description: 'Пользователи видят только свои записи при scope = own',
-    appliesTo: 'crm_records'
+    descriptionKey: 'policies_vendor_scope',
+    appliesToKey: 'settings_roles_permissions'
   }
 ];
 
@@ -176,6 +165,7 @@ function hasPermission(permission: string, granted: string[]): boolean {
 
 export default function Settings() {
   const auth = useContext(AuthContext);
+  const { t } = useI18n();
 
   if (!auth) {
     throw new Error('AuthContext not available');
@@ -196,8 +186,8 @@ export default function Settings() {
     return (
       <div className="page">
         <div className="card">
-          <h2 className="card__title">Недостаточно прав</h2>
-          <p className="muted">Нужен permission settings.view, чтобы открыть Core Settings.</p>
+          <h2 className="card__title">{t('settings_access_denied_title')}</h2>
+          <p className="muted">{t('settings_access_denied_body')}</p>
         </div>
       </div>
     );
@@ -207,10 +197,10 @@ export default function Settings() {
     <div className="page settings-page">
       <div className="page__header">
         <div>
-          <p className="muted">Core</p>
-          <h1 className="page__title">Settings</h1>
+          <p className="muted">{t('settings_scope_core')}</p>
+          <h1 className="page__title">{t('settings_title')}</h1>
         </div>
-        <span className="badge">Admin</span>
+        <span className="badge">{t('settings_badge_admin')}</span>
       </div>
 
       <div className="settings-layout">
@@ -228,7 +218,7 @@ export default function Settings() {
                 onClick={() => setActive(item.key)}
                 disabled={disabled}
               >
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
                 <span className="muted">{item.permission}</span>
               </button>
             );
@@ -248,9 +238,10 @@ export default function Settings() {
 }
 
 function SystemSection() {
+  const { t, languages, defaultLanguage } = useI18n();
   const [generalState, setGeneralState] = useState({
     systemName: 'Core platform',
-    defaultLanguage: languages.find((lang) => lang.isDefault)?.code || 'en',
+    defaultLanguage: defaultLanguage || 'en',
     timezone: 'UTC',
     developerMode: true
   });
@@ -262,29 +253,33 @@ function SystemSection() {
   });
   const [message, setMessage] = useState<string | null>(null);
 
+  useEffect(() => {
+    setGeneralState((prev) => ({ ...prev, defaultLanguage: defaultLanguage || prev.defaultLanguage }));
+  }, [defaultLanguage]);
+
   const handleGeneralSubmit = (event: FormEvent) => {
     event.preventDefault();
-    setMessage('System general saved (POST /api/core/v1/settings/system)');
+    setMessage(t('settings_system_saved'));
   };
 
   const handleSecuritySubmit = (event: FormEvent) => {
     event.preventDefault();
-    setMessage('Security saved (POST /api/core/v1/settings/security)');
+    setMessage(t('settings_security_saved'));
   };
 
   return (
     <div className="stack">
       <div className="card">
-        <div className="card__header">
-          <div>
-            <p className="muted">System</p>
-            <h2 className="card__title">General</h2>
-          </div>
+          <div className="card__header">
+            <div>
+            <p className="muted">{t('settings_system_label')}</p>
+            <h2 className="card__title">{t('settings_system_general')}</h2>
+            </div>
           <div className="pill">GET /api/core/v1/settings/system</div>
         </div>
         <form className="form two-column" onSubmit={handleGeneralSubmit}>
           <label className="form__label" htmlFor="systemName">
-            System name
+            {t('settings_system_name')}
           </label>
           <input
             id="systemName"
@@ -294,7 +289,7 @@ function SystemSection() {
           />
 
           <label className="form__label" htmlFor="defaultLanguage">
-            Default language
+            {t('settings_system_default_language')}
           </label>
           <select
             id="defaultLanguage"
@@ -303,7 +298,7 @@ function SystemSection() {
             onChange={(e) => setGeneralState({ ...generalState, defaultLanguage: e.target.value })}
           >
             {languages
-              .filter((lang) => lang.enabled)
+              .filter((lang) => lang.is_active)
               .map((lang) => (
                 <option key={lang.code} value={lang.code}>
                   {lang.name}
@@ -312,7 +307,7 @@ function SystemSection() {
           </select>
 
           <label className="form__label" htmlFor="timezone">
-            Timezone
+            {t('settings_system_timezone')}
           </label>
           <input
             id="timezone"
@@ -323,7 +318,7 @@ function SystemSection() {
           />
 
           <label className="form__label" htmlFor="developerMode">
-            Developer mode
+            {t('settings_system_developer_mode')}
           </label>
           <label className="toggle">
             <input
@@ -334,14 +329,14 @@ function SystemSection() {
             />
             <span>
               {generalState.developerMode
-                ? 'Логируются payload и SQL (без паролей)'
-                : 'Только error / warning'}
+                ? t('settings_system_developer_mode_on')
+                : t('settings_system_developer_mode_off')}
             </span>
           </label>
 
           <div className="form__actions">
             <button className="button button-primary" type="submit">
-              Save general
+              {t('settings_system_save_general')}
             </button>
           </div>
         </form>
@@ -350,14 +345,14 @@ function SystemSection() {
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">System</p>
-            <h2 className="card__title">Security</h2>
+            <p className="muted">{t('settings_system_label')}</p>
+            <h2 className="card__title">{t('settings_system_security')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/settings/security</div>
         </div>
         <form className="form two-column" onSubmit={handleSecuritySubmit}>
           <label className="form__label" htmlFor="localPasswords">
-            Enable local passwords
+            {t('settings_security_local_passwords')}
           </label>
           <input
             id="localPasswords"
@@ -369,7 +364,7 @@ function SystemSection() {
           />
 
           <label className="form__label" htmlFor="enableSSO">
-            Enable SSO
+            {t('settings_security_sso')}
           </label>
           <input
             id="enableSSO"
@@ -379,7 +374,7 @@ function SystemSection() {
           />
 
           <label className="form__label" htmlFor="jwtTtl">
-            JWT TTL (minutes)
+            {t('settings_security_jwt_ttl')}
           </label>
           <input
             id="jwtTtl"
@@ -391,7 +386,7 @@ function SystemSection() {
           />
 
           <label className="form__label" htmlFor="multipleSessions">
-            Allow multiple sessions
+            {t('settings_security_multiple_sessions')}
           </label>
           <input
             id="multipleSessions"
@@ -404,7 +399,7 @@ function SystemSection() {
 
           <div className="form__actions">
             <button className="button button-primary" type="submit">
-              Save security
+              {t('settings_security_save')}
             </button>
           </div>
         </form>
@@ -416,43 +411,44 @@ function SystemSection() {
 }
 
 function UsersSection() {
+  const { t } = useI18n();
   return (
     <div className="stack">
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Users</p>
-            <h2 className="card__title">Users</h2>
+            <p className="muted">{t('settings_users_label')}</p>
+            <h2 className="card__title">{t('settings_users_title')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/users</div>
         </div>
         <div className="actions-row">
           <button className="button button-primary" type="button">
-            Создать пользователя
+            {t('settings_users_create')}
           </button>
           <button className="button button-secondary" type="button">
-            Деактивировать
+            {t('settings_users_deactivate')}
           </button>
           <button className="button button-secondary" type="button">
-            Сменить язык
+            {t('settings_users_change_language')}
           </button>
           <button className="button button-secondary" type="button">
-            Сбросить пароль
+            {t('settings_users_reset_password')}
           </button>
         </div>
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
-                <th>Email</th>
-                <th>Имя</th>
-                <th>Фамилия</th>
-                <th>Компания</th>
-                <th>Статус</th>
-                <th>Язык</th>
-                <th>Роли</th>
-                <th>Группы</th>
-                <th>Департамент</th>
+                <th>{t('settings_users_email')}</th>
+                <th>{t('settings_users_first_name')}</th>
+                <th>{t('settings_users_last_name')}</th>
+                <th>{t('settings_users_company')}</th>
+                <th>{t('settings_users_status')}</th>
+                <th>{t('settings_users_language')}</th>
+                <th>{t('settings_users_roles')}</th>
+                <th>{t('settings_users_groups')}</th>
+                <th>{t('settings_users_department')}</th>
               </tr>
             </thead>
             <tbody>
@@ -464,7 +460,7 @@ function UsersSection() {
                   <td>{user.company}</td>
                   <td>
                     <span className={`status status-${user.status}`}>
-                      {user.status === 'active' ? 'active' : 'inactive'}
+                      {user.status === 'active' ? t('status_active') : t('status_inactive')}
                     </span>
                   </td>
                   <td>{user.language}</td>
@@ -497,8 +493,8 @@ function UsersSection() {
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Users</p>
-            <h2 className="card__title">Departments</h2>
+            <p className="muted">{t('settings_users_label')}</p>
+            <h2 className="card__title">{t('settings_departments_title')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/departments</div>
         </div>
@@ -506,7 +502,7 @@ function UsersSection() {
           <div className="tree__node">
             <div>
               <strong>CEO Office</strong>
-              <p className="muted">Руководитель: Elena Morozova</p>
+              <p className="muted">{t('settings_departments_lead')}: Elena Morozova</p>
             </div>
             <div className="tags">
               <span className="tag">ceo@example.com</span>
@@ -516,7 +512,7 @@ function UsersSection() {
             <div className="tree__node">
               <div>
                 <strong>Sales</strong>
-                <p className="muted">Руководитель: Ivan Petrov</p>
+                <p className="muted">{t('settings_departments_lead')}: Ivan Petrov</p>
               </div>
               <div className="tags">
                 <span className="tag">manager@example.com</span>
@@ -526,7 +522,7 @@ function UsersSection() {
             <div className="tree__node">
               <div>
                 <strong>Operations</strong>
-                <p className="muted">Руководитель: N/A</p>
+                <p className="muted">{t('settings_departments_lead')}: N/A</p>
               </div>
               <div className="tags">
                 <span className="tag">ops@example.com</span>
@@ -536,7 +532,7 @@ function UsersSection() {
         </div>
         <div className="card__footer">
           <button className="button button-secondary" type="button">
-            Добавить департамент
+            {t('settings_departments_add')}
           </button>
         </div>
       </div>
@@ -544,8 +540,8 @@ function UsersSection() {
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Users</p>
-            <h2 className="card__title">Groups</h2>
+            <p className="muted">{t('settings_users_label')}</p>
+            <h2 className="card__title">{t('settings_groups_title')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/groups</div>
         </div>
@@ -557,7 +553,7 @@ function UsersSection() {
         </div>
         <div className="card__footer">
           <button className="button button-secondary" type="button">
-            Добавить группу
+            {t('settings_groups_add')}
           </button>
         </div>
       </div>
@@ -566,13 +562,14 @@ function UsersSection() {
 }
 
 function RolesSection() {
+  const { t } = useI18n();
   return (
     <div className="stack">
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Roles & Access</p>
-            <h2 className="card__title">Roles</h2>
+            <p className="muted">{t('settings_roles_label')}</p>
+            <h2 className="card__title">{t('settings_roles_title')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/roles</div>
         </div>
@@ -580,17 +577,17 @@ function RolesSection() {
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Scope</th>
-                <th>Permissions</th>
+                <th>{t('settings_roles_code')}</th>
+                <th>{t('settings_roles_name')}</th>
+                <th>{t('settings_roles_scope')}</th>
+                <th>{t('settings_roles_permissions')}</th>
               </tr>
             </thead>
             <tbody>
               {roles.map((role) => (
                 <tr key={role.code}>
                   <td>{role.code}</td>
-                  <td>{role.name}</td>
+                  <td>{t(role.nameKey)}</td>
                   <td>
                     <span className="pill pill-muted">{role.scope}</span>
                   </td>
@@ -610,7 +607,7 @@ function RolesSection() {
         </div>
         <div className="card__footer">
           <button className="button button-secondary" type="button">
-            Добавить роль
+            {t('settings_roles_add')}
           </button>
         </div>
       </div>
@@ -618,12 +615,12 @@ function RolesSection() {
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Roles & Access</p>
-            <h2 className="card__title">Permissions</h2>
+            <p className="muted">{t('settings_roles_label')}</p>
+            <h2 className="card__title">{t('settings_permissions_title')}</h2>
           </div>
           <div className="pill">System only</div>
         </div>
-        <p className="muted">Системные permissions не редактируются, только назначаются.</p>
+        <p className="muted">{t('settings_permissions_hint')}</p>
         <div className="tags">
           {permissionsCatalog.map((perm) => (
             <span key={perm} className="tag">
@@ -636,22 +633,22 @@ function RolesSection() {
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Roles & Access</p>
-            <h2 className="card__title">Access Policies (ABAC)</h2>
+            <p className="muted">{t('settings_roles_label')}</p>
+            <h2 className="card__title">{t('settings_policies_title')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/access/policies</div>
         </div>
         <ul className="list">
           {policies.map((policy) => (
             <li key={policy.id} className="list__item">
-              <p className="list__title">{policy.description}</p>
-              <p className="muted">Применяется к: {policy.appliesTo}</p>
+              <p className="list__title">{t(policy.descriptionKey)}</p>
+              <p className="muted">{t('settings_policies_apply')}: {t(policy.appliesToKey)}</p>
             </li>
           ))}
         </ul>
         <div className="card__footer">
           <button className="button button-secondary" type="button">
-            Создать policy
+            {t('settings_policies_add')}
           </button>
         </div>
       </div>
@@ -660,26 +657,80 @@ function RolesSection() {
 }
 
 function LanguagesSection() {
-  const enabledCount = languages.filter((lang) => lang.enabled).length;
+  const { t, languages, defaultLanguage, translations, registerTranslation, refresh } = useI18n();
+  const enabledCount = languages.filter((lang) => lang.is_active).length;
+  const [languageForm, setLanguageForm] = useState({ code: '', name: '', is_default: false });
+  const [translationForm, setTranslationForm] = useState({ key: '', value: '', language: defaultLanguage || 'en' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTranslationForm((prev) => ({ ...prev, language: defaultLanguage || prev.language }));
+  }, [defaultLanguage]);
+
+  const translationRows = useMemo(
+    () =>
+      Object.entries(translations).flatMap(([lang, entries]) =>
+        Object.entries(entries).map(([key, value]) => ({ key, value, language: lang }))
+      ),
+    [translations]
+  );
+
+  const handleLanguageSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await createLanguage({
+        code: languageForm.code,
+        name: languageForm.name,
+        is_active: true,
+        is_default: languageForm.is_default
+      });
+      setLanguageForm({ code: '', name: '', is_default: false });
+      await refresh();
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleStatusToggle = async (lang: Language, active: boolean) => {
+    await updateLanguage(lang.code, { is_active: active });
+    await refresh();
+  };
+
+  const handleDefaultToggle = async (lang: Language) => {
+    await updateLanguage(lang.code, { is_default: true, is_active: true });
+    await refresh();
+  };
+
+  const handleTranslationSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await registerTranslation(translationForm.key, { [translationForm.language]: translationForm.value });
+      setTranslationForm({ key: '', value: '', language: defaultLanguage || 'en' });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="stack">
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Languages</p>
-            <h2 className="card__title">Languages</h2>
+            <p className="muted">{t('settings_languages_label')}</p>
+            <h2 className="card__title">{t('settings_languages_title')}</h2>
           </div>
-          <div className="pill">GET /api/core/v1/languages</div>
+          <div className="pill">GET /api/core/v1/i18n/languages</div>
         </div>
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
-                <th>Code</th>
-                <th>Name</th>
-                <th>Status</th>
-                <th>Default</th>
+                <th>{t('settings_languages_code')}</th>
+                <th>{t('settings_languages_name')}</th>
+                <th>{t('settings_languages_status')}</th>
+                <th>{t('settings_languages_default')}</th>
               </tr>
             </thead>
             <tbody>
@@ -688,61 +739,157 @@ function LanguagesSection() {
                   <td>{lang.code}</td>
                   <td>{lang.name}</td>
                   <td>
-                    <span className={`status status-${lang.enabled ? 'active' : 'inactive'}`}>
-                      {lang.enabled ? 'enabled' : 'disabled'}
-                    </span>
+                    <label className="toggle">
+                      <input
+                        type="checkbox"
+                        checked={lang.is_active}
+                        onChange={(e) => handleStatusToggle(lang, e.target.checked)}
+                      />
+                      <span>{lang.is_active ? t('status_enabled') : t('status_disabled')}</span>
+                    </label>
                   </td>
-                  <td>{lang.isDefault ? 'Yes' : '—'}</td>
+                  <td>
+                    <label className="toggle">
+                      <input
+                        type="radio"
+                        name="default-language"
+                        checked={lang.is_default}
+                        onChange={() => handleDefaultToggle(lang)}
+                      />
+                      <span>{lang.is_default ? t('status_yes') : t('status_no')}</span>
+                    </label>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <div className="card__footer">
-          <p className="muted">Включено языков: {enabledCount}</p>
-          <button className="button button-secondary" type="button">
-            Добавить язык
-          </button>
+          <p className="muted">{t('settings_languages_enabled_count', { count: enabledCount })}</p>
         </div>
       </div>
 
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Languages</p>
-            <h2 className="card__title">Translations</h2>
+            <p className="muted">{t('settings_languages_label')}</p>
+            <h2 className="card__title">{t('settings_languages_form_title')}</h2>
           </div>
-          <div className="pill">Read-only showcase</div>
+          <div className="pill">POST /api/core/v1/i18n/languages</div>
         </div>
+        <form className="form" onSubmit={handleLanguageSubmit}>
+          <label className="form__label" htmlFor="langCode">
+            {t('settings_languages_form_code')}
+          </label>
+          <input
+            id="langCode"
+            className="input"
+            value={languageForm.code}
+            onChange={(e) => setLanguageForm({ ...languageForm, code: e.target.value })}
+            required
+          />
+
+          <label className="form__label" htmlFor="langName">
+            {t('settings_languages_form_name')}
+          </label>
+          <input
+            id="langName"
+            className="input"
+            value={languageForm.name}
+            onChange={(e) => setLanguageForm({ ...languageForm, name: e.target.value })}
+            required
+          />
+
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={languageForm.is_default}
+              onChange={(e) => setLanguageForm({ ...languageForm, is_default: e.target.checked })}
+            />
+            <span>{t('settings_languages_form_is_default')}</span>
+          </label>
+
+          <div className="form__actions">
+            <button className="button button-primary" type="submit" disabled={saving}>
+              {t('settings_languages_form_submit')}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div className="card">
+        <div className="card__header">
+          <div>
+            <p className="muted">{t('settings_languages_label')}</p>
+            <h2 className="card__title">{t('settings_translations_title')}</h2>
+          </div>
+          <div className="pill">/api/core/v1/i18n/translations</div>
+        </div>
+        <form className="form" onSubmit={handleTranslationSubmit}>
+          <label className="form__label" htmlFor="translationKey">
+            {t('settings_translations_form_key')}
+          </label>
+          <input
+            id="translationKey"
+            className="input"
+            value={translationForm.key}
+            onChange={(e) => setTranslationForm({ ...translationForm, key: e.target.value })}
+            required
+          />
+
+          <label className="form__label" htmlFor="translationLanguage">
+            {t('settings_translations_form_language')}
+          </label>
+          <select
+            id="translationLanguage"
+            className="input"
+            value={translationForm.language}
+            onChange={(e) => setTranslationForm({ ...translationForm, language: e.target.value })}
+          >
+            {languages.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.name}
+              </option>
+            ))}
+          </select>
+
+          <label className="form__label" htmlFor="translationValue">
+            {t('settings_translations_form_value')}
+          </label>
+          <input
+            id="translationValue"
+            className="input"
+            value={translationForm.value}
+            onChange={(e) => setTranslationForm({ ...translationForm, value: e.target.value })}
+            required
+          />
+
+          <div className="form__actions">
+            <button className="button button-primary" type="submit" disabled={saving}>
+              {t('settings_translations_form_submit')}
+            </button>
+          </div>
+        </form>
+
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
-                <th>Key</th>
-                <th>Value</th>
-                <th>Language</th>
-                <th>Aliases</th>
+                <th>{t('settings_translations_key')}</th>
+                <th>{t('settings_translations_value')}</th>
+                <th>{t('settings_translations_language')}</th>
+                <th>{t('settings_translations_aliases')}</th>
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>settings.title</td>
-                <td>Settings</td>
-                <td>en</td>
-                <td>—</td>
-              </tr>
-              <tr>
-                <td>settings.title</td>
-                <td>Настройки</td>
-                <td>ru</td>
-                <td>settings.header</td>
-              </tr>
-              <tr>
-                <td>audit.empty</td>
-                <td>No audit records</td>
-                <td>en</td>
-                <td>—</td>
-              </tr>
+              {translationRows.map((row) => (
+                <tr key={`${row.key}-${row.language}`}>
+                  <td>{row.key}</td>
+                  <td>{row.value}</td>
+                  <td>{row.language}</td>
+                  <td>{t('status_no')}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -752,6 +899,7 @@ function LanguagesSection() {
 }
 
 function AuditSection() {
+  const { t } = useI18n();
   const [filters, setFilters] = useState({
     from: '',
     to: '',
@@ -788,15 +936,15 @@ function AuditSection() {
       <div className="card">
         <div className="card__header">
           <div>
-            <p className="muted">Audit</p>
-            <h2 className="card__title">Audit Logs</h2>
+            <p className="muted">{t('settings_audit_label')}</p>
+            <h2 className="card__title">{t('settings_audit_title')}</h2>
           </div>
           <div className="pill">GET /api/core/v1/audit</div>
         </div>
 
         <div className="filters">
           <label>
-            From
+            {t('settings_audit_filter_from')}
             <input
               type="date"
               className="input"
@@ -805,7 +953,7 @@ function AuditSection() {
             />
           </label>
           <label>
-            To
+            {t('settings_audit_filter_to')}
             <input
               type="date"
               className="input"
@@ -814,13 +962,13 @@ function AuditSection() {
             />
           </label>
           <label>
-            Event
+            {t('settings_audit_filter_event')}
             <select
               className="input"
               value={filters.event}
               onChange={(e) => setFilters({ ...filters, event: e.target.value })}
             >
-              <option value="">Any</option>
+              <option value="">{t('settings_audit_filter_any')}</option>
               {Array.from(new Set(auditLogs.map((log) => log.event))).map((event) => (
                 <option key={event} value={event}>
                   {event}
@@ -829,17 +977,17 @@ function AuditSection() {
             </select>
           </label>
           <label>
-            Search payload
+            {t('settings_audit_filter_search')}
             <input
               type="search"
               className="input"
-              placeholder="ILIKE payload"
+              placeholder={t('settings_audit_filter_search')}
               value={filters.q}
               onChange={(e) => setFilters({ ...filters, q: e.target.value })}
             />
           </label>
           <label>
-            Limit
+            {t('settings_audit_filter_limit')}
             <input
               type="number"
               min="1"
@@ -854,11 +1002,11 @@ function AuditSection() {
           <table className="table">
             <thead>
               <tr>
-                <th>Date / Time</th>
-                <th>Event</th>
-                <th>User</th>
-                <th>Entity</th>
-                <th>Payload</th>
+                <th>{t('settings_audit_table_date')}</th>
+                <th>{t('settings_audit_table_event')}</th>
+                <th>{t('settings_audit_table_user')}</th>
+                <th>{t('settings_audit_table_entity')}</th>
+                <th>{t('settings_audit_table_payload')}</th>
               </tr>
             </thead>
             <tbody>
@@ -885,7 +1033,7 @@ function AuditSection() {
 
         <div className="pagination">
           <div>
-            Страница {filters.page} из {totalPages}
+            {t('settings_audit_page', { page: filters.page, total: totalPages })}
           </div>
           <div className="actions-row">
             <button
@@ -894,7 +1042,7 @@ function AuditSection() {
               onClick={() => setFilters({ ...filters, page: Math.max(1, filters.page - 1) })}
               disabled={filters.page === 1}
             >
-              Назад
+              {t('common_prev')}
             </button>
             <button
               className="button button-secondary"
@@ -902,7 +1050,7 @@ function AuditSection() {
               onClick={() => setFilters({ ...filters, page: Math.min(totalPages, filters.page + 1) })}
               disabled={filters.page >= totalPages}
             >
-              Вперед
+              {t('common_next')}
             </button>
           </div>
         </div>
@@ -912,12 +1060,12 @@ function AuditSection() {
         <div className="card">
           <div className="card__header">
             <div>
-              <p className="muted">Payload</p>
+              <p className="muted">{t('settings_audit_table_payload')}</p>
               <h2 className="card__title">{selectedLog.event}</h2>
             </div>
-            <div className="pill">read-only</div>
+            <div className="pill">{t('common_read_only')}</div>
           </div>
-          <p className="muted">Источник: audit.audit_log · id {selectedLog.id}</p>
+          <p className="muted">{t('settings_audit_payload_source', { id: selectedLog.id })}</p>
           <pre className="code-block">{JSON.stringify(selectedLog.payload, null, 2)}</pre>
         </div>
       )}

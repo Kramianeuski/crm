@@ -1,10 +1,12 @@
 import { NavLink } from 'react-router-dom';
+import { useI18n } from '../app/i18n';
 
 const navItems = [
-  { label: 'Settings', to: '/settings' }
+  { labelKey: 'sidebar_settings', to: '/settings' }
 ];
 
 export default function Sidebar() {
+  const { t } = useI18n();
   return (
     <aside className="sidebar">
       <nav className="sidebar__nav">
@@ -14,7 +16,7 @@ export default function Sidebar() {
             to={item.to}
             className={({ isActive }) => `nav-link ${isActive ? 'is-active' : ''}`}
           >
-            {item.label}
+            {t(item.labelKey)}
           </NavLink>
         ))}
       </nav>
