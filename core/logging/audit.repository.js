@@ -1,22 +1,3 @@
-const AUDIT_SCHEMA_SQL = `
-  CREATE SCHEMA IF NOT EXISTS audit;
-
-  CREATE TABLE IF NOT EXISTS audit.audit_log (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    event text NOT NULL,
-    payload jsonb,
-    created_at timestamptz NOT NULL DEFAULT now()
-  );
-`;
-
-export async function ensureAuditStructures(db, logger) {
-  try {
-    await db.query(AUDIT_SCHEMA_SQL);
-  } catch (err) {
-    logger.warn(err, 'Failed to ensure audit schema');
-  }
-}
-
 export async function insertAuditLog(db, entry, logger) {
   try {
     await db.query(
