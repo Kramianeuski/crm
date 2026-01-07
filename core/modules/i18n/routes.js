@@ -1,5 +1,5 @@
 import {
-  ensureKey,
+  upsertKey,
   getDefaultLanguage,
   listLanguages,
   loadTranslations,
@@ -42,7 +42,7 @@ export default async function i18nRoutes(fastify) {
     const { key, description } = request.body || {};
     if (!key) return reply.code(400).send({ error: 'invalid_request' });
 
-    await ensureKey(fastify.pg, key, description || null);
+    await upsertKey(fastify.pg, key, description || null);
     return reply.code(201).send({ key });
   });
 

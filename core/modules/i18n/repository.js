@@ -68,7 +68,7 @@ export async function updateLanguage(pg, code, patch) {
   }
 }
 
-export async function ensureKey(pg, key, description = null) {
+export async function upsertKey(pg, key, description = null) {
   await pg.query(
     `INSERT INTO core.i18n_keys (key, description)
      VALUES ($1, $2)
@@ -84,7 +84,7 @@ export async function upsertTranslations(pg, key, translations) {
   try {
     await client.query('BEGIN');
 
-    await ensureKey(client, key, null);
+    await upsertKey(client, key, null);
 
     const entries = Object.entries(translations || {});
 
