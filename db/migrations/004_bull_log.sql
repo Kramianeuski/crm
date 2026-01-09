@@ -1,3 +1,4 @@
+-- migrate:up
 CREATE TABLE bull.bull_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   queue text NOT NULL,

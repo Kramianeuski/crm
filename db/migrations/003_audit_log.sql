@@ -1,3 +1,4 @@
+-- migrate:up
 CREATE TABLE audit.audit_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type text NOT NULL,

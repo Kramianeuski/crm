@@ -1,3 +1,5 @@
+-- migrate:up
+
 -- I18n foundation: languages + translation keys
 
 -- Align languages table with i18n contract
@@ -443,3 +445,13 @@ INSERT INTO core.i18n_translations (key, language_code, value) VALUES
   ('settings_languages_status_toggle', 'ru', 'Активен'),
   ('settings_languages_default_toggle', 'ru', 'Основной')
 ON CONFLICT (key, language_code) DO UPDATE SET value = EXCLUDED.value;
+
+-- migrate:down
+
+-- NOTE:
+-- Seed / i18n migrations are usually NOT rolled back in production.
+-- Intentionally left minimal.
+
+-- Optional destructive rollback (commented):
+-- DROP TABLE IF EXISTS core.i18n_translations;
+-- DROP TABLE IF EXISTS core.i18n_keys;
