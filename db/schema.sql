@@ -1,4 +1,4 @@
-\restrict a96odBCbqcdVOjnAE9fXcHs4WWYkfdy9a7oTawWYqGkIMllwzsJjFuiKhg4XsVe
+\restrict 1RHxL24YzMfeLYwMobguFNLRTm0gee5hGlu44BMUXvXI9nIBLz3s6EF5ldubrLv
 
 -- Dumped from database version 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)
 -- Dumped by pg_dump version 16.11 (Ubuntu 16.11-0ubuntu0.24.04.1)
@@ -43,6 +43,13 @@ CREATE SCHEMA ext;
 
 
 --
+-- Name: system; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA system;
+
+
+--
 -- Name: pgcrypto; Type: EXTENSION; Schema: -; Owner: -
 --
 
@@ -59,6 +66,33 @@ COMMENT ON EXTENSION pgcrypto IS 'cryptographic functions';
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: audit_log; Type: TABLE; Schema: audit; Owner: -
+--
+
+CREATE TABLE audit.audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    event_type text NOT NULL,
+    entity_type text,
+    entity_id uuid,
+    actor_user_id uuid,
+    payload jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: bull_log; Type: TABLE; Schema: bull; Owner: -
+--
+
+CREATE TABLE bull.bull_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    queue text NOT NULL,
+    payload jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 
 --
 -- Name: access_policies; Type: TABLE; Schema: core; Owner: -
@@ -423,6 +457,22 @@ ALTER TABLE ONLY core.user_identities ALTER COLUMN id SET DEFAULT nextval('core.
 
 
 --
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: audit; Owner: -
+--
+
+ALTER TABLE ONLY audit.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: bull_log bull_log_pkey; Type: CONSTRAINT; Schema: bull; Owner: -
+--
+
+ALTER TABLE ONLY bull.bull_log
+    ADD CONSTRAINT bull_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: access_policies access_policies_pkey; Type: CONSTRAINT; Schema: core; Owner: -
 --
 
@@ -663,6 +713,34 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
+-- Name: idx_audit_log_created_at; Type: INDEX; Schema: audit; Owner: -
+--
+
+CREATE INDEX idx_audit_log_created_at ON audit.audit_log USING btree (created_at);
+
+
+--
+-- Name: idx_audit_log_entity; Type: INDEX; Schema: audit; Owner: -
+--
+
+CREATE INDEX idx_audit_log_entity ON audit.audit_log USING btree (entity_type, entity_id);
+
+
+--
+-- Name: idx_bull_log_created_at; Type: INDEX; Schema: bull; Owner: -
+--
+
+CREATE INDEX idx_bull_log_created_at ON bull.bull_log USING btree (created_at);
+
+
+--
+-- Name: idx_bull_log_queue; Type: INDEX; Schema: bull; Owner: -
+--
+
+CREATE INDEX idx_bull_log_queue ON bull.bull_log USING btree (queue);
+
+
+--
 -- Name: ux_languages_default; Type: INDEX; Schema: core; Owner: -
 --
 
@@ -825,7 +903,7 @@ ALTER TABLE ONLY core.users
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a96odBCbqcdVOjnAE9fXcHs4WWYkfdy9a7oTawWYqGkIMllwzsJjFuiKhg4XsVe
+\unrestrict 1RHxL24YzMfeLYwMobguFNLRTm0gee5hGlu44BMUXvXI9nIBLz3s6EF5ldubrLv
 
 
 --
@@ -834,4 +912,6 @@ ALTER TABLE ONLY core.users
 
 INSERT INTO public.schema_migrations (version) VALUES
     ('001'),
-    ('002');
+    ('002'),
+    ('003'),
+    ('004');

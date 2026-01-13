@@ -1,4 +1,5 @@
 -- migrate:up
+
 CREATE TABLE audit.audit_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_type text NOT NULL,
@@ -15,4 +16,6 @@ CREATE INDEX idx_audit_log_created_at
 CREATE INDEX idx_audit_log_entity
   ON audit.audit_log (entity_type, entity_id);
 
-INSERT INTO public.schema_migrations (version) VALUES ('003');
+-- migrate:down
+
+DROP TABLE IF EXISTS audit.audit_log;

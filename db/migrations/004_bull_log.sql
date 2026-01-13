@@ -1,4 +1,5 @@
 -- migrate:up
+
 CREATE TABLE bull.bull_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   queue text NOT NULL,
@@ -12,4 +13,6 @@ CREATE INDEX idx_bull_log_created_at
 CREATE INDEX idx_bull_log_queue
   ON bull.bull_log (queue);
 
-INSERT INTO public.schema_migrations (version) VALUES ('004');
+-- migrate:down
+
+DROP TABLE IF EXISTS bull.bull_log;
