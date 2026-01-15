@@ -1,19 +1,12 @@
 import dotenv from 'dotenv';
-
-const envResult = dotenv.config({ path: '/etc/crm/core.env' });
-if (envResult.error) {
-  throw envResult.error;
-}
-
 import process from 'process';
 
+dotenv.config({ path: process.env.CORE_ENV_PATH || '.env' });
+
 const REQUIRED_ENV = [
-  'CORE_PORT',
-  'DB_HOST',
-  'DB_PORT',
-  'DB_NAME',
-  'DB_USER',
-  'DB_PASSWORD',
+  'PORT',
+  'DATABASE_URL',
+  'NODE_ENV',
   'JWT_SECRET'
 ];
 
@@ -24,22 +17,25 @@ function validateEnv() {
     }
   }
 
-  const port = Number(process.env.CORE_PORT);
+  const port = Number(process.env.PORT);
   if (Number.isNaN(port)) {
-    throw new Error('CORE_PORT must be a number');
-  }
-
-  const dbPort = Number(process.env.DB_PORT);
-  if (Number.isNaN(dbPort)) {
-    throw new Error('DB_PORT must be a number');
+    throw new Error('PORT must be a number');
   }
 }
 
 validateEnv();
 
 const { default: buildApp } = await import('./app.js');
+const { default: healthRoutes } = await import('./modules/health/routes.js');
+const { default: authRoutes } = await import('./modules/auth/routes.js');
+const { default: accessRoutes } = await import('./modules/access/routes.js');
+const { default: settingsRoutes } = await import('./modules/settings/routes.js');
+const { default: i18nRoutes } = await import('./modules/i18n/routes.js');
+const { default: partnersRoutes } = await import('./modules/partners/routes.js');
 
 const app = buildApp();
+const coreBasePath = '/api/core/v1';
+const partnersBasePath = '/api/partners/v1';
 let isShuttingDown = false;
 
 const shutdown = async (signal) => {
@@ -59,7 +55,14 @@ process.on('SIGINT', shutdown);
 
 const start = async () => {
   try {
-    const port = Number(process.env.CORE_PORT);
+    app.register(healthRoutes, { logLevel: 'silent' });
+    app.register(i18nRoutes, { prefix: coreBasePath });
+    app.register(authRoutes, { prefix: coreBasePath });
+    app.register(accessRoutes, { prefix: coreBasePath });
+    app.register(settingsRoutes, { prefix: coreBasePath });
+    app.register(partnersRoutes, { prefix: partnersBasePath });
+
+    const port = Number(process.env.PORT);
     await app.listen({ port, host: '0.0.0.0' });
     app.log.info(
       { port, env: process.env.NODE_ENV },

@@ -14,7 +14,7 @@ export default async function settingsRoutes(fastify) {
     return { resource: parts.join('.'), action };
   };
 
-  fastify.get('/api/core/v1/settings/modules', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.get('/settings/modules', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
       const modules = await fetchModules(fastify.pg);
       const result = [];
@@ -53,7 +53,7 @@ export default async function settingsRoutes(fastify) {
     }
   });
 
-  fastify.get('/api/core/v1/settings/schema/:module/:page', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.get('/settings/schema/:module/:page', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
       const { module, page } = request.params;
       const moduleRow = await findModule(fastify.pg, module);
@@ -81,7 +81,7 @@ export default async function settingsRoutes(fastify) {
   });
 
   fastify.post(
-    '/api/core/v1/settings/value/:module/:page',
+    '/settings/value/:module/:page',
     { preHandler: fastify.verifyJWT },
     async (request, reply) => {
       try {
