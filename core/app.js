@@ -16,11 +16,7 @@ import accessPlugin from './plugins/access.js';
 
 import auditHook from './hooks/audit.hook.js';
 
-import healthRoutes from './modules/health/routes.js';
-import authRoutes from './modules/auth/routes.js';
-import accessRoutes from './modules/access/routes.js';
-import settingsRoutes from './modules/settings/routes.js';
-import i18nRoutes from './modules/i18n/routes.js';
+import partnerJwtPlugin from './plugins/partner-jwt.js';
 
 export default function buildApp() {
   const logger = createLogger();
@@ -67,23 +63,13 @@ export default function buildApp() {
   app.register(jwtPlugin);
   app.register(authPlugin);
   app.register(accessPlugin);
+  app.register(partnerJwtPlugin);
 
   /* =========================
    * Hooks
    * ========================= */
 
   app.register(auditHook);
-
-  /* =========================
-   * Routes
-   * ========================= */
-
-  app.register(healthRoutes, { logLevel: 'silent' });
-
-  app.register(authRoutes, { prefix: '/api' });
-  app.register(accessRoutes, { prefix: '/api' });
-  app.register(settingsRoutes, { prefix: '/api' });
-  app.register(i18nRoutes, { prefix: '/api' });
 
   /* =========================
    * Global error handler

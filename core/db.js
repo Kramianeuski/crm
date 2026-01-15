@@ -1,6 +1,8 @@
 import { Pool } from 'pg';
 
 function validateDbEnv() {
+  if (process.env.DATABASE_URL) return;
+
   const required = [
     'DB_HOST',
     'DB_PORT',
@@ -23,20 +25,27 @@ function validateDbEnv() {
 
 validateDbEnv();
 
-const dbPort = Number(process.env.DB_PORT);
+const dbPort = process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined;
+const ssl = process.env.DB_SSL === 'true'
+  ? { rejectUnauthorized: false }
+  : undefined;
+
+const poolConfig = process.env.DATABASE_URL
+  ? { connectionString: process.env.DATABASE_URL, ssl }
+  : {
+      host: process.env.DB_HOST,
+      port: dbPort,
+      database: process.env.DB_NAME,
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      ssl
+    };
 
 export const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: dbPort,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
+  ...poolConfig,
   max: Number(process.env.DB_POOL_SIZE || 20),
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 2_000,
-  ssl: process.env.DB_SSL === 'true'
-    ? { rejectUnauthorized: false }
-    : undefined
+  connectionTimeoutMillis: 2_000
 });
 
 pool.on('error', err => {

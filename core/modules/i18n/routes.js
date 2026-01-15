@@ -9,13 +9,13 @@ import {
 } from './repository.js';
 
 export default async function i18nRoutes(fastify) {
-  fastify.get('/api/core/v1/i18n/languages', async (request, reply) => {
+  fastify.get('/i18n/languages', async (request, reply) => {
     const languages = await listLanguages(fastify.pg);
     const defaultLanguage = await getDefaultLanguage(fastify.pg);
     return reply.send({ languages, defaultLanguage });
   });
 
-  fastify.post('/api/core/v1/i18n/languages', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.post('/i18n/languages', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     const { code, name, is_active, is_default } = request.body || {};
     if (!code || !name) return reply.code(400).send({ error: 'invalid_request' });
 
@@ -23,7 +23,7 @@ export default async function i18nRoutes(fastify) {
     return reply.code(201).send({ language });
   });
 
-  fastify.patch('/api/core/v1/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.patch('/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     const { code } = request.params;
     const { name, is_active, is_default } = request.body || {};
     const updated = await updateLanguage(fastify.pg, code, { name, is_active, is_default });
@@ -31,14 +31,14 @@ export default async function i18nRoutes(fastify) {
     return reply.send({ language: updated });
   });
 
-  fastify.get('/api/core/v1/i18n/translations', async (request, reply) => {
+  fastify.get('/i18n/translations', async (request, reply) => {
     const languages = await listLanguages(fastify.pg);
     const defaultLanguage = await getDefaultLanguage(fastify.pg);
     const translations = await loadTranslations(fastify.pg);
     return reply.send({ languages, defaultLanguage, translations });
   });
 
-  fastify.post('/api/core/v1/i18n/keys', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.post('/i18n/keys', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     const { key, description } = request.body || {};
     if (!key) return reply.code(400).send({ error: 'invalid_request' });
 
@@ -46,7 +46,7 @@ export default async function i18nRoutes(fastify) {
     return reply.code(201).send({ key });
   });
 
-  fastify.post('/api/core/v1/i18n/translations', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.post('/i18n/translations', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     const { key, translations } = request.body || {};
     if (!key || typeof translations !== 'object') {
       return reply.code(400).send({ error: 'invalid_request' });

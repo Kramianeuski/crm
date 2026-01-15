@@ -1,6 +1,8 @@
-import { authenticate, buildUserContext } from './service.js';
+import { authenticate, buildUserContext } from '../auth/service.js';
 
-export default async function authRoutes(fastify) {
+const isPartnerUser = groups => groups?.some(group => group.code === 'partners');
+
+export default async function partnersRoutes(fastify) {
   fastify.post('/auth/login', async (request, reply) => {
     try {
       const { email, password } = request.body || {};
@@ -15,7 +17,11 @@ export default async function authRoutes(fastify) {
           .send({ error: result.error });
       }
 
-      const token = fastify.signToken({
+      if (!isPartnerUser(result.groups)) {
+        return reply.code(403).send({ error: 'partner_forbidden' });
+      }
+
+      const token = fastify.signPartnerToken({
         sub: result.user.id,
         email: result.user.email,
         lang: result.user.lang,
@@ -30,10 +36,14 @@ export default async function authRoutes(fastify) {
     }
   });
 
-  fastify.get('/auth/me', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.get('/auth/me', { preHandler: fastify.verifyPartnerJWT }, async (request, reply) => {
     try {
-      const ctx = await buildUserContext(request.user.id);
+      const ctx = await buildUserContext(request.partner.id);
       if (!ctx) return reply.code(404).send({ error: 'user_not_found' });
+
+      if (!isPartnerUser(ctx.groups)) {
+        return reply.code(403).send({ error: 'partner_forbidden' });
+      }
 
       return reply.send({
         user: ctx.user,
