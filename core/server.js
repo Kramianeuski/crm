@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+dotenv.config({ path: '/etc/crm/core.env' });
 import process from 'process';
 
 dotenv.config({ path: process.env.CORE_ENV_PATH || '.env' });
