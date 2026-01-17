@@ -33,14 +33,14 @@ export default async function i18nRoutes(fastify) {
 
   fastify.post('/i18n/languages', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
-      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'manage');
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'create');
       if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
       const { code, name, is_active, is_default } = request.body || {};
-      if (!code || !name) return reply.code(400).send({ error: 'invalid_request' });
+      if (!code || !name) return reply.code(422).send({ error: 'invalid_request' });
 
       const result = await createLanguage(fastify.pg, { code, name, is_active, is_default });
-      if (result.error) return reply.code(400).send({ error: result.error });
+      if (result.error) return reply.code(422).send({ error: result.error });
 
       return reply.code(201).send({ language: result.language });
     } catch (err) {
@@ -51,7 +51,7 @@ export default async function i18nRoutes(fastify) {
 
   fastify.put('/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
-      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'manage');
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'edit');
       if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
       const { code } = request.params;
@@ -63,7 +63,7 @@ export default async function i18nRoutes(fastify) {
       }
 
       if (result.error) {
-        return reply.code(400).send({ error: result.error });
+        return reply.code(422).send({ error: result.error });
       }
 
       return reply.send({ language: result.language });
@@ -75,7 +75,7 @@ export default async function i18nRoutes(fastify) {
 
   fastify.delete('/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
-      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'manage');
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'delete');
       if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
       const { code } = request.params;
@@ -86,7 +86,7 @@ export default async function i18nRoutes(fastify) {
       }
 
       if (result.error) {
-        return reply.code(400).send({ error: result.error });
+        return reply.code(422).send({ error: result.error });
       }
 
       return reply.code(204).send();
@@ -119,12 +119,12 @@ export default async function i18nRoutes(fastify) {
 
   fastify.put('/i18n/translations', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
-      const allowed = await fastify.canAccess(request.user, 'i18n.translations', 'manage');
+      const allowed = await fastify.canAccess(request.user, 'i18n.translations', 'edit');
       if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
       const { key, translations, aliases } = request.body || {};
       if (!key || typeof translations !== 'object') {
-        return reply.code(400).send({ error: 'invalid_request' });
+        return reply.code(422).send({ error: 'invalid_request' });
       }
 
       await upsertTranslations(fastify.pg, key, translations);

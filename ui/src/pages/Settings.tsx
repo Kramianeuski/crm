@@ -50,7 +50,7 @@ const navItems: NavItem[] = [
   { key: 'system', labelKey: 'settings_nav_system', permission: 'settings.view' },
   { key: 'users', labelKey: 'settings_nav_users', permission: 'users.view' },
   { key: 'roles', labelKey: 'settings_nav_roles', permission: 'roles.view' },
-  { key: 'languages', labelKey: 'settings_nav_languages', permission: 'i18n.languages.manage' },
+  { key: 'languages', labelKey: 'settings_nav_languages', permission: 'i18n.languages.view' },
   { key: 'audit', labelKey: 'settings_nav_audit', permission: 'audit.view' }
 ];
 
@@ -129,11 +129,14 @@ const auditLogs: AuditLog[] = [
   }
 ];
 
+const NO_PERMISSION_MESSAGE = "You don't have permission";
+
 function hasPermission(permission: string, granted: string[]): boolean {
-  if (granted.length === 0) {
-    return true;
-  }
   return granted.includes(permission);
+}
+
+function permissionTooltip(allowed: boolean): string | undefined {
+  return allowed ? undefined : NO_PERMISSION_MESSAGE;
 }
 
 export default function Settings() {
@@ -190,6 +193,7 @@ export default function Settings() {
                 type="button"
                 onClick={() => setActive(item.key)}
                 disabled={disabled}
+                title={permissionTooltip(!disabled)}
               >
                 <span>{t(item.labelKey)}</span>
                 <span className="muted">{item.permission}</span>
@@ -199,19 +203,21 @@ export default function Settings() {
         </nav>
 
         <div className="settings-content">
-          {active === 'system' && <SystemSection />}
-          {active === 'users' && <UsersSection />}
-          {active === 'roles' && <RolesSection />}
-          {active === 'languages' && <LanguagesSection />}
-          {active === 'audit' && <AuditSection />}
+          {active === 'system' && <SystemSection permissions={permissions} />}
+          {active === 'users' && <UsersSection permissions={permissions} />}
+          {active === 'roles' && <RolesSection permissions={permissions} />}
+          {active === 'languages' && <LanguagesSection permissions={permissions} />}
+          {active === 'audit' && <AuditSection permissions={permissions} />}
         </div>
       </div>
     </div>
   );
 }
 
-function SystemSection() {
+function SystemSection({ permissions }: { permissions: string[] }) {
   const { t, languages, defaultLanguage } = useI18n();
+  const canEditSystem = hasPermission('settings.system.edit', permissions);
+  const canEditAccess = hasPermission('settings.access.edit', permissions);
   const [generalState, setGeneralState] = useState({
     systemName: 'SISSOL CRM',
     defaultLanguage: defaultLanguage || 'en',
@@ -257,12 +263,14 @@ function SystemSection() {
 
   const handleGeneralSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canEditSystem) return;
     await updateSettings({ system: generalState });
     setMessage(t('settings_system_saved'));
   };
 
   const handleSecuritySubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canEditAccess) return;
     await updateSettings({ security: securityState });
     setMessage(t('settings_security_saved'));
   };
@@ -286,6 +294,8 @@ function SystemSection() {
             className="input"
             value={generalState.systemName}
             onChange={(e) => setGeneralState({ ...generalState, systemName: e.target.value })}
+            disabled={!canEditSystem}
+            title={permissionTooltip(canEditSystem)}
           />
 
           <label className="form__label" htmlFor="defaultLanguage">
@@ -296,6 +306,8 @@ function SystemSection() {
             className="input"
             value={generalState.defaultLanguage}
             onChange={(e) => setGeneralState({ ...generalState, defaultLanguage: e.target.value })}
+            disabled={!canEditSystem}
+            title={permissionTooltip(canEditSystem)}
           >
             {languages
               .filter((lang) => lang.is_active)
@@ -315,17 +327,20 @@ function SystemSection() {
             value={generalState.timezone}
             onChange={(e) => setGeneralState({ ...generalState, timezone: e.target.value })}
             placeholder="UTC"
+            disabled={!canEditSystem}
+            title={permissionTooltip(canEditSystem)}
           />
 
           <label className="form__label" htmlFor="developerMode">
             {t('settings_system_developer_mode')}
           </label>
-          <label className="toggle">
+          <label className="toggle" title={permissionTooltip(canEditSystem)}>
             <input
               id="developerMode"
               type="checkbox"
               checked={generalState.developerMode}
               onChange={(e) => setGeneralState({ ...generalState, developerMode: e.target.checked })}
+              disabled={!canEditSystem}
             />
             <span>
               {generalState.developerMode
@@ -335,7 +350,12 @@ function SystemSection() {
           </label>
 
           <div className="form__actions">
-            <button className="button button-primary" type="submit">
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={!canEditSystem}
+              title={permissionTooltip(canEditSystem)}
+            >
               {t('settings_system_save_general')}
             </button>
           </div>
@@ -361,6 +381,8 @@ function SystemSection() {
             onChange={(e) =>
               setSecurityState({ ...securityState, enableLocalPasswords: e.target.checked })
             }
+            disabled={!canEditAccess}
+            title={permissionTooltip(canEditAccess)}
           />
 
           <label className="form__label" htmlFor="enableSSO">
@@ -371,6 +393,8 @@ function SystemSection() {
             type="checkbox"
             checked={securityState.enableSSO}
             onChange={(e) => setSecurityState({ ...securityState, enableSSO: e.target.checked })}
+            disabled={!canEditAccess}
+            title={permissionTooltip(canEditAccess)}
           />
 
           <label className="form__label" htmlFor="jwtTtl">
@@ -383,6 +407,8 @@ function SystemSection() {
             min="5"
             value={securityState.jwtTtl}
             onChange={(e) => setSecurityState({ ...securityState, jwtTtl: Number(e.target.value) })}
+            disabled={!canEditAccess}
+            title={permissionTooltip(canEditAccess)}
           />
 
           <label className="form__label" htmlFor="multipleSessions">
@@ -395,10 +421,17 @@ function SystemSection() {
             onChange={(e) =>
               setSecurityState({ ...securityState, allowMultipleSessions: e.target.checked })
             }
+            disabled={!canEditAccess}
+            title={permissionTooltip(canEditAccess)}
           />
 
           <div className="form__actions">
-            <button className="button button-primary" type="submit">
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={!canEditAccess}
+              title={permissionTooltip(canEditAccess)}
+            >
               {t('settings_security_save')}
             </button>
           </div>
@@ -410,8 +443,14 @@ function SystemSection() {
   );
 }
 
-function UsersSection() {
+function UsersSection({ permissions }: { permissions: string[] }) {
   const { t } = useI18n();
+  const canCreateUser = hasPermission('users.create', permissions);
+  const canEditUser = hasPermission('users.edit', permissions);
+  const canDeleteUser = hasPermission('users.delete', permissions);
+  const canCreateDepartment = hasPermission('departments.create', permissions);
+  const canCreateGroup = hasPermission('groups.create', permissions);
+
   return (
     <div className="stack">
       <div className="card">
@@ -423,16 +462,36 @@ function UsersSection() {
           <div className="pill">GET /api/core/v1/users</div>
         </div>
         <div className="actions-row">
-          <button className="button button-primary" type="button">
+          <button
+            className="button button-primary"
+            type="button"
+            disabled={!canCreateUser}
+            title={permissionTooltip(canCreateUser)}
+          >
             {t('settings_users_create')}
           </button>
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canDeleteUser}
+            title={permissionTooltip(canDeleteUser)}
+          >
             {t('settings_users_deactivate')}
           </button>
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canEditUser}
+            title={permissionTooltip(canEditUser)}
+          >
             {t('settings_users_change_language')}
           </button>
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canEditUser}
+            title={permissionTooltip(canEditUser)}
+          >
             {t('settings_users_reset_password')}
           </button>
         </div>
@@ -531,7 +590,12 @@ function UsersSection() {
           </div>
         </div>
         <div className="card__footer">
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canCreateDepartment}
+            title={permissionTooltip(canCreateDepartment)}
+          >
             {t('settings_departments_add')}
           </button>
         </div>
@@ -552,7 +616,12 @@ function UsersSection() {
           <span className="tag">support</span>
         </div>
         <div className="card__footer">
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canCreateGroup}
+            title={permissionTooltip(canCreateGroup)}
+          >
             {t('settings_groups_add')}
           </button>
         </div>
@@ -561,10 +630,12 @@ function UsersSection() {
   );
 }
 
-function RolesSection() {
+function RolesSection({ permissions }: { permissions: string[] }) {
   const { t } = useI18n();
   const [roleRows, setRoleRows] = useState<Role[]>([]);
   const [permissionRows, setPermissionRows] = useState<Permission[]>([]);
+  const canCreateRole = hasPermission('roles.create', permissions);
+  const canAssignPermissions = hasPermission('roles.permissions.assign', permissions);
 
   useEffect(() => {
     const loadRoles = async () => {
@@ -627,7 +698,12 @@ function RolesSection() {
           </table>
         </div>
         <div className="card__footer">
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canCreateRole}
+            title={permissionTooltip(canCreateRole)}
+          >
             {t('settings_roles_add')}
           </button>
         </div>
@@ -668,7 +744,12 @@ function RolesSection() {
           ))}
         </ul>
         <div className="card__footer">
-          <button className="button button-secondary" type="button">
+          <button
+            className="button button-secondary"
+            type="button"
+            disabled={!canAssignPermissions}
+            title={permissionTooltip(canAssignPermissions)}
+          >
             {t('settings_policies_add')}
           </button>
         </div>
@@ -677,27 +758,53 @@ function RolesSection() {
   );
 }
 
-function LanguagesSection() {
+function LanguagesSection({ permissions }: { permissions: string[] }) {
   const { t, languages, defaultLanguage, translations, registerTranslation, refresh } = useI18n();
   const enabledCount = languages.filter((lang) => lang.is_active).length;
   const [languageForm, setLanguageForm] = useState({ code: '', name: '', is_default: false });
-  const [translationForm, setTranslationForm] = useState({ key: '', value: '', language: defaultLanguage || 'en' });
+  const [translationForm, setTranslationForm] = useState({ key: '', values: {} as Record<string, string> });
   const [saving, setSaving] = useState(false);
+  const [rowSaving, setRowSaving] = useState<Record<string, boolean>>({});
+  const [draftTranslations, setDraftTranslations] = useState<Record<string, Record<string, string>>>({});
+  const canCreateLanguage = hasPermission('i18n.languages.create', permissions);
+  const canEditLanguage = hasPermission('i18n.languages.edit', permissions);
+  const canCreateTranslation = hasPermission('i18n.translations.create', permissions);
+  const canEditTranslation = hasPermission('i18n.translations.edit', permissions);
 
   useEffect(() => {
-    setTranslationForm((prev) => ({ ...prev, language: defaultLanguage || prev.language }));
+    if (defaultLanguage) {
+      setTranslationForm((prev) => ({
+        ...prev,
+        values: { ...prev.values, [defaultLanguage]: prev.values[defaultLanguage] ?? '' }
+      }));
+    }
   }, [defaultLanguage]);
 
-  const translationRows = useMemo(
-    () =>
-      Object.entries(translations).flatMap(([lang, entries]) =>
-        Object.entries(entries).map(([key, value]) => ({ key, value, language: lang }))
-      ),
-    [translations]
-  );
+  const translationRows = useMemo(() => {
+    const keys = new Set<string>();
+    Object.values(translations).forEach((entries) => {
+      Object.keys(entries).forEach((key) => keys.add(key));
+    });
+    return Array.from(keys).sort().map((key) => ({
+      key,
+      values: languages.reduce<Record<string, string>>((acc, lang) => {
+        acc[lang.code] = translations[lang.code]?.[key] ?? '';
+        return acc;
+      }, {})
+    }));
+  }, [translations, languages]);
+
+  useEffect(() => {
+    const nextDraft: Record<string, Record<string, string>> = {};
+    translationRows.forEach((row) => {
+      nextDraft[row.key] = { ...row.values };
+    });
+    setDraftTranslations(nextDraft);
+  }, [translationRows]);
 
   const handleLanguageSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    if (!canCreateLanguage) return;
     setSaving(true);
     try {
       await createLanguage({
@@ -714,23 +821,35 @@ function LanguagesSection() {
   };
 
   const handleStatusToggle = async (lang: Language, active: boolean) => {
+    if (!canEditLanguage) return;
     await updateLanguage(lang.code, { is_active: active });
     await refresh();
   };
 
   const handleDefaultToggle = async (lang: Language) => {
+    if (!canEditLanguage) return;
     await updateLanguage(lang.code, { is_default: true, is_active: true });
     await refresh();
   };
 
-  const handleTranslationSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+  const handleTranslationSubmit = async () => {
+    if (!canCreateTranslation) return;
     setSaving(true);
     try {
-      await registerTranslation(translationForm.key, { [translationForm.language]: translationForm.value });
-      setTranslationForm({ key: '', value: '', language: defaultLanguage || 'en' });
+      await registerTranslation(translationForm.key, translationForm.values);
+      setTranslationForm({ key: '', values: {} });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTranslationSave = async (key: string) => {
+    if (!canEditTranslation) return;
+    setRowSaving((prev) => ({ ...prev, [key]: true }));
+    try {
+      await registerTranslation(key, draftTranslations[key] || {});
+    } finally {
+      setRowSaving((prev) => ({ ...prev, [key]: false }));
     }
   };
 
@@ -760,22 +879,24 @@ function LanguagesSection() {
                   <td>{lang.code}</td>
                   <td>{lang.name}</td>
                   <td>
-                    <label className="toggle">
+                    <label className="toggle" title={permissionTooltip(canEditLanguage)}>
                       <input
                         type="checkbox"
                         checked={lang.is_active}
                         onChange={(e) => handleStatusToggle(lang, e.target.checked)}
+                        disabled={!canEditLanguage}
                       />
                       <span>{lang.is_active ? t('status_enabled') : t('status_disabled')}</span>
                     </label>
                   </td>
                   <td>
-                    <label className="toggle">
+                    <label className="toggle" title={permissionTooltip(canEditLanguage)}>
                       <input
                         type="radio"
                         name="default-language"
                         checked={lang.is_default}
                         onChange={() => handleDefaultToggle(lang)}
+                        disabled={!canEditLanguage}
                       />
                       <span>{lang.is_default ? t('status_yes') : t('status_no')}</span>
                     </label>
@@ -807,6 +928,8 @@ function LanguagesSection() {
             className="input"
             value={languageForm.code}
             onChange={(e) => setLanguageForm({ ...languageForm, code: e.target.value })}
+            disabled={!canCreateLanguage}
+            title={permissionTooltip(canCreateLanguage)}
             required
           />
 
@@ -818,6 +941,8 @@ function LanguagesSection() {
             className="input"
             value={languageForm.name}
             onChange={(e) => setLanguageForm({ ...languageForm, name: e.target.value })}
+            disabled={!canCreateLanguage}
+            title={permissionTooltip(canCreateLanguage)}
             required
           />
 
@@ -826,12 +951,18 @@ function LanguagesSection() {
               type="checkbox"
               checked={languageForm.is_default}
               onChange={(e) => setLanguageForm({ ...languageForm, is_default: e.target.checked })}
+              disabled={!canCreateLanguage}
             />
             <span>{t('settings_languages_form_is_default')}</span>
           </label>
 
           <div className="form__actions">
-            <button className="button button-primary" type="submit" disabled={saving}>
+            <button
+              className="button button-primary"
+              type="submit"
+              disabled={saving || !canCreateLanguage}
+              title={permissionTooltip(canCreateLanguage)}
+            >
               {t('settings_languages_form_submit')}
             </button>
           </div>
@@ -846,69 +977,88 @@ function LanguagesSection() {
           </div>
           <div className="pill">/api/core/v1/i18n/translations</div>
         </div>
-        <form className="form" onSubmit={handleTranslationSubmit}>
-          <label className="form__label" htmlFor="translationKey">
-            {t('settings_translations_form_key')}
-          </label>
-          <input
-            id="translationKey"
-            className="input"
-            value={translationForm.key}
-            onChange={(e) => setTranslationForm({ ...translationForm, key: e.target.value })}
-            required
-          />
-
-          <label className="form__label" htmlFor="translationLanguage">
-            {t('settings_translations_form_language')}
-          </label>
-          <select
-            id="translationLanguage"
-            className="input"
-            value={translationForm.language}
-            onChange={(e) => setTranslationForm({ ...translationForm, language: e.target.value })}
-          >
-            {languages.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.name}
-              </option>
-            ))}
-          </select>
-
-          <label className="form__label" htmlFor="translationValue">
-            {t('settings_translations_form_value')}
-          </label>
-          <input
-            id="translationValue"
-            className="input"
-            value={translationForm.value}
-            onChange={(e) => setTranslationForm({ ...translationForm, value: e.target.value })}
-            required
-          />
-
-          <div className="form__actions">
-            <button className="button button-primary" type="submit" disabled={saving}>
-              {t('settings_translations_form_submit')}
-            </button>
-          </div>
-        </form>
-
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
                 <th>{t('settings_translations_key')}</th>
-                <th>{t('settings_translations_value')}</th>
-                <th>{t('settings_translations_language')}</th>
-                <th>{t('settings_translations_aliases')}</th>
+                {languages.map((lang) => (
+                  <th key={lang.code}>{lang.code.toUpperCase()}</th>
+                ))}
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
+              <tr>
+                <td>
+                  <input
+                    className="input"
+                    value={translationForm.key}
+                    onChange={(e) => setTranslationForm({ ...translationForm, key: e.target.value })}
+                    disabled={!canCreateTranslation}
+                    title={permissionTooltip(canCreateTranslation)}
+                    placeholder={t('settings_translations_form_key')}
+                  />
+                </td>
+                {languages.map((lang) => (
+                  <td key={lang.code}>
+                    <input
+                      className="input"
+                      value={translationForm.values[lang.code] || ''}
+                      onChange={(e) =>
+                        setTranslationForm({
+                          ...translationForm,
+                          values: { ...translationForm.values, [lang.code]: e.target.value }
+                        })
+                      }
+                      disabled={!canCreateTranslation}
+                      title={permissionTooltip(canCreateTranslation)}
+                      placeholder={lang.name}
+                    />
+                  </td>
+                ))}
+                <td>
+                  <button
+                    className="button button-primary"
+                    type="button"
+                    onClick={handleTranslationSubmit}
+                    disabled={saving || !canCreateTranslation || !translationForm.key}
+                    title={permissionTooltip(canCreateTranslation)}
+                  >
+                    {t('settings_translations_form_submit')}
+                  </button>
+                </td>
+              </tr>
               {translationRows.map((row) => (
-                <tr key={`${row.key}-${row.language}`}>
+                <tr key={row.key}>
                   <td>{row.key}</td>
-                  <td>{row.value}</td>
-                  <td>{row.language}</td>
-                  <td>{t('status_no')}</td>
+                  {languages.map((lang) => (
+                    <td key={lang.code}>
+                      <input
+                        className="input"
+                        value={draftTranslations[row.key]?.[lang.code] ?? ''}
+                        onChange={(e) =>
+                          setDraftTranslations((prev) => ({
+                            ...prev,
+                            [row.key]: { ...(prev[row.key] || {}), [lang.code]: e.target.value }
+                          }))
+                        }
+                        disabled={!canEditTranslation}
+                        title={permissionTooltip(canEditTranslation)}
+                      />
+                    </td>
+                  ))}
+                  <td>
+                    <button
+                      className="button button-secondary"
+                      type="button"
+                      onClick={() => handleTranslationSave(row.key)}
+                      disabled={rowSaving[row.key] || !canEditTranslation}
+                      title={permissionTooltip(canEditTranslation)}
+                    >
+                      {t('settings_translations_form_submit')}
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -919,8 +1069,9 @@ function LanguagesSection() {
   );
 }
 
-function AuditSection() {
+function AuditSection({ permissions }: { permissions: string[] }) {
   const { t } = useI18n();
+  const canViewAudit = hasPermission('audit.view', permissions);
   const [filters, setFilters] = useState({
     from: '',
     to: '',
@@ -951,6 +1102,15 @@ function AuditSection() {
   useEffect(() => {
     setFilters((prev) => ({ ...prev, page: 1 }));
   }, [filters.from, filters.to, filters.event, filters.q, filters.limit]);
+
+  if (!canViewAudit) {
+    return (
+      <div className="card">
+        <h2 className="card__title">{t('settings_access_denied_title')}</h2>
+        <p className="muted">{t('settings_access_denied_body')}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="stack">
