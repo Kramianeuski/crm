@@ -32,6 +32,7 @@ const { default: authRoutes } = await import('./modules/auth/routes.js');
 const { default: accessRoutes } = await import('./modules/access/routes.js');
 const { default: settingsRoutes } = await import('./modules/settings/routes.js');
 const { default: i18nRoutes } = await import('./modules/i18n/routes.js');
+const { default: rbacRoutes } = await import('./modules/rbac/routes.js');
 const { default: partnersRoutes } = await import('./modules/partners/routes.js');
 
 const app = buildApp();
@@ -60,6 +61,7 @@ const start = async () => {
     app.register(i18nRoutes, { prefix: coreBasePath });
     app.register(authRoutes, { prefix: coreBasePath });
     app.register(accessRoutes, { prefix: coreBasePath });
+    app.register(rbacRoutes, { prefix: coreBasePath });
     app.register(settingsRoutes, { prefix: coreBasePath });
     app.register(partnersRoutes, { prefix: partnersBasePath });
 

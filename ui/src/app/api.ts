@@ -23,6 +23,39 @@ export type TranslationsResponse = {
   translations: Record<string, Record<string, string>>;
 };
 
+export type CoreSettings = {
+  system: {
+    systemName: string;
+    defaultLanguage: string;
+    timezone: string;
+    developerMode: boolean;
+  };
+  security: {
+    enableLocalPasswords: boolean;
+    enableSSO: boolean;
+    jwtTtl: number;
+    allowMultipleSessions: boolean;
+  };
+};
+
+export type RolePermission = {
+  code: string;
+  scope: string;
+};
+
+export type Role = {
+  id: string;
+  code: string;
+  name_key: string;
+  permissions: RolePermission[];
+};
+
+export type Permission = {
+  id: string;
+  code: string;
+  description: string | null;
+};
+
 type MeResponse = {
   user: {
     id: number | string;
@@ -169,22 +202,36 @@ export async function createLanguage(payload: {
 
 export async function updateLanguage(code: string, payload: Partial<Language>): Promise<Language> {
   const { language } = await apiFetch<{ language: Language }>(`/core/v1/i18n/languages/${code}`, {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify(payload)
   });
   return language;
 }
 
-export async function registerKey(key: string, description?: string): Promise<void> {
-  await apiFetch('/core/v1/i18n/keys', {
-    method: 'POST',
-    body: JSON.stringify({ key, description })
+export async function upsertTranslation(payload: { key: string; translations: Record<string, string> }): Promise<void> {
+  await apiFetch('/core/v1/i18n/translations', {
+    method: 'PUT',
+    body: JSON.stringify(payload)
   });
 }
 
-export async function upsertTranslation(payload: { key: string; translations: Record<string, string> }): Promise<void> {
-  await apiFetch('/core/v1/i18n/translations', {
-    method: 'POST',
+export async function fetchSettings(): Promise<CoreSettings> {
+  return apiFetch<CoreSettings>('/core/v1/settings');
+}
+
+export async function updateSettings(payload: Partial<CoreSettings>): Promise<void> {
+  await apiFetch('/core/v1/settings', {
+    method: 'PUT',
     body: JSON.stringify(payload)
   });
+}
+
+export async function fetchRoles(): Promise<Role[]> {
+  const { roles } = await apiFetch<{ roles: Role[] }>('/core/v1/roles');
+  return roles;
+}
+
+export async function fetchPermissions(): Promise<Permission[]> {
+  const { permissions } = await apiFetch<{ permissions: Permission[] }>('/core/v1/permissions');
+  return permissions;
 }
