@@ -1,6 +1,16 @@
 import { FormEvent, useContext, useEffect, useMemo, useState } from 'react';
 import { AuthContext } from '../app/App';
-import { Language, createLanguage, updateLanguage } from '../app/api';
+import {
+  Language,
+  Permission,
+  Role,
+  createLanguage,
+  fetchPermissions,
+  fetchRoles,
+  fetchSettings,
+  updateLanguage,
+  updateSettings
+} from '../app/api';
 import { useI18n } from '../app/i18n';
 
 type NavItem = {
@@ -21,13 +31,6 @@ type UserRow = {
   department: string;
 };
 
-type RoleRow = {
-  code: string;
-  nameKey: string;
-  scope: 'none' | 'own' | 'department' | 'all';
-  permissions: string[];
-};
-
 type AccessPolicy = {
   id: string;
   descriptionKey: string;
@@ -44,10 +47,10 @@ type AuditLog = {
 };
 
 const navItems: NavItem[] = [
-  { key: 'system', labelKey: 'settings_nav_system', permission: 'system.manage' },
-  { key: 'users', labelKey: 'settings_nav_users', permission: 'users.manage' },
-  { key: 'roles', labelKey: 'settings_nav_roles', permission: 'roles.manage' },
-  { key: 'languages', labelKey: 'settings_nav_languages', permission: 'languages.manage' },
+  { key: 'system', labelKey: 'settings_nav_system', permission: 'settings.view' },
+  { key: 'users', labelKey: 'settings_nav_users', permission: 'users.view' },
+  { key: 'roles', labelKey: 'settings_nav_roles', permission: 'roles.view' },
+  { key: 'languages', labelKey: 'settings_nav_languages', permission: 'i18n.languages.manage' },
   { key: 'audit', labelKey: 'settings_nav_audit', permission: 'audit.view' }
 ];
 
@@ -84,27 +87,6 @@ const users: UserRow[] = [
     roles: ['viewer'],
     groups: ['partners'],
     department: 'Vendors'
-  }
-];
-
-const roles: RoleRow[] = [
-  {
-    code: 'owner',
-    nameKey: 'roles_owner_name',
-    scope: 'all',
-    permissions: ['settings.view', 'system.manage', 'roles.manage', 'users.manage', 'languages.manage', 'audit.view']
-  },
-  {
-    code: 'manager',
-    nameKey: 'roles_manager_name',
-    scope: 'department',
-    permissions: ['settings.view', 'users.manage', 'audit.view']
-  },
-  {
-    code: 'viewer',
-    nameKey: 'roles_viewer_name',
-    scope: 'own',
-    permissions: ['settings.view', 'audit.view']
   }
 ];
 
@@ -145,15 +127,6 @@ const auditLogs: AuditLog[] = [
     payload: { email: 'new.user@example.com', department: 'Sales' },
     created_at: '2024-08-02T10:00:00Z'
   }
-];
-
-const permissionsCatalog = [
-  'settings.view',
-  'system.manage',
-  'users.manage',
-  'roles.manage',
-  'languages.manage',
-  'audit.view'
 ];
 
 function hasPermission(permission: string, granted: string[]): boolean {
@@ -240,10 +213,10 @@ export default function Settings() {
 function SystemSection() {
   const { t, languages, defaultLanguage } = useI18n();
   const [generalState, setGeneralState] = useState({
-    systemName: 'Core platform',
+    systemName: 'SISSOL CRM',
     defaultLanguage: defaultLanguage || 'en',
     timezone: 'UTC',
-    developerMode: true
+    developerMode: false
   });
   const [securityState, setSecurityState] = useState({
     enableLocalPasswords: true,
@@ -257,13 +230,40 @@ function SystemSection() {
     setGeneralState((prev) => ({ ...prev, defaultLanguage: defaultLanguage || prev.defaultLanguage }));
   }, [defaultLanguage]);
 
-  const handleGeneralSubmit = (event: FormEvent) => {
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const data = await fetchSettings();
+        setGeneralState({
+          systemName: data.system.systemName,
+          defaultLanguage: data.system.defaultLanguage,
+          timezone: data.system.timezone,
+          developerMode: data.system.developerMode
+        });
+        setSecurityState({
+          enableLocalPasswords: data.security.enableLocalPasswords,
+          enableSSO: data.security.enableSSO,
+          jwtTtl: data.security.jwtTtl,
+          allowMultipleSessions: data.security.allowMultipleSessions
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load settings', err);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  const handleGeneralSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    await updateSettings({ system: generalState });
     setMessage(t('settings_system_saved'));
   };
 
-  const handleSecuritySubmit = (event: FormEvent) => {
+  const handleSecuritySubmit = async (event: FormEvent) => {
     event.preventDefault();
+    await updateSettings({ security: securityState });
     setMessage(t('settings_security_saved'));
   };
 
@@ -275,7 +275,7 @@ function SystemSection() {
             <p className="muted">{t('settings_system_label')}</p>
             <h2 className="card__title">{t('settings_system_general')}</h2>
             </div>
-          <div className="pill">GET /api/core/v1/settings/system</div>
+          <div className="pill">GET /api/core/v1/settings</div>
         </div>
         <form className="form two-column" onSubmit={handleGeneralSubmit}>
           <label className="form__label" htmlFor="systemName">
@@ -348,7 +348,7 @@ function SystemSection() {
             <p className="muted">{t('settings_system_label')}</p>
             <h2 className="card__title">{t('settings_system_security')}</h2>
           </div>
-          <div className="pill">GET /api/core/v1/settings/security</div>
+          <div className="pill">GET /api/core/v1/settings</div>
         </div>
         <form className="form two-column" onSubmit={handleSecuritySubmit}>
           <label className="form__label" htmlFor="localPasswords">
@@ -563,6 +563,27 @@ function UsersSection() {
 
 function RolesSection() {
   const { t } = useI18n();
+  const [roleRows, setRoleRows] = useState<Role[]>([]);
+  const [permissionRows, setPermissionRows] = useState<Permission[]>([]);
+
+  useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const [rolesData, permissionsData] = await Promise.all([
+          fetchRoles(),
+          fetchPermissions()
+        ]);
+        setRoleRows(rolesData);
+        setPermissionRows(permissionsData);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load roles data', err);
+      }
+    };
+
+    loadRoles();
+  }, []);
+
   return (
     <div className="stack">
       <div className="card">
@@ -584,18 +605,18 @@ function RolesSection() {
               </tr>
             </thead>
             <tbody>
-              {roles.map((role) => (
+              {roleRows.map((role) => (
                 <tr key={role.code}>
                   <td>{role.code}</td>
-                  <td>{t(role.nameKey)}</td>
+                  <td>{t(role.name_key)}</td>
                   <td>
-                    <span className="pill pill-muted">{role.scope}</span>
+                    <span className="pill pill-muted">{role.permissions[0]?.scope || 'none'}</span>
                   </td>
                   <td>
                     <div className="tags">
                       {role.permissions.map((perm) => (
-                        <span key={perm} className="tag">
-                          {perm}
+                        <span key={perm.code} className="tag">
+                          {perm.code}
                         </span>
                       ))}
                     </div>
@@ -618,13 +639,13 @@ function RolesSection() {
             <p className="muted">{t('settings_roles_label')}</p>
             <h2 className="card__title">{t('settings_permissions_title')}</h2>
           </div>
-          <div className="pill">System only</div>
+          <div className="pill">GET /api/core/v1/permissions</div>
         </div>
         <p className="muted">{t('settings_permissions_hint')}</p>
         <div className="tags">
-          {permissionsCatalog.map((perm) => (
-            <span key={perm} className="tag">
-              {perm}
+          {permissionRows.map((perm) => (
+            <span key={perm.code} className="tag">
+              {perm.code}
             </span>
           ))}
         </div>

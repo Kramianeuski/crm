@@ -38,7 +38,7 @@ export default async function authRoutes(fastify) {
       return reply.send({
         user: ctx.user,
         roles: ctx.roles,
-        permissions: ctx.permissions,
+        permissions: ctx.permissions.map(permission => permission.code),
         lang: ctx.user.lang
       });
     } catch (err) {

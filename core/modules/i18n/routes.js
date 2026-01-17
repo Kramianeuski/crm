@@ -1,58 +1,140 @@
 import {
-  upsertKey,
+  createLanguage,
+  deleteLanguage,
   getDefaultLanguage,
   listLanguages,
   loadTranslations,
   updateLanguage,
-  upsertLanguage,
+  upsertAliases,
   upsertTranslations
 } from './repository.js';
 
+async function optionalVerify(fastify, request) {
+  const authHeader = request.headers.authorization;
+  if (!authHeader) return false;
+  await fastify.verifyJWT(request);
+  return Boolean(request.user);
+}
+
 export default async function i18nRoutes(fastify) {
-  fastify.get('/i18n/languages', async (request, reply) => {
-    const languages = await listLanguages(fastify.pg);
-    const defaultLanguage = await getDefaultLanguage(fastify.pg);
-    return reply.send({ languages, defaultLanguage });
+  fastify.get('/i18n/languages', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+    try {
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'view');
+      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
+
+      const languages = await listLanguages(fastify.pg);
+      const defaultLanguage = await getDefaultLanguage(fastify.pg);
+      return reply.send({ languages, defaultLanguage });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
+    }
   });
 
   fastify.post('/i18n/languages', { preHandler: fastify.verifyJWT }, async (request, reply) => {
-    const { code, name, is_active, is_default } = request.body || {};
-    if (!code || !name) return reply.code(400).send({ error: 'invalid_request' });
+    try {
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'manage');
+      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
-    const language = await upsertLanguage(fastify.pg, { code, name, is_active, is_default });
-    return reply.code(201).send({ language });
+      const { code, name, is_active, is_default } = request.body || {};
+      if (!code || !name) return reply.code(400).send({ error: 'invalid_request' });
+
+      const result = await createLanguage(fastify.pg, { code, name, is_active, is_default });
+      if (result.error) return reply.code(400).send({ error: result.error });
+
+      return reply.code(201).send({ language: result.language });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
+    }
   });
 
-  fastify.patch('/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
-    const { code } = request.params;
-    const { name, is_active, is_default } = request.body || {};
-    const updated = await updateLanguage(fastify.pg, code, { name, is_active, is_default });
-    if (!updated) return reply.code(404).send({ error: 'language_not_found' });
-    return reply.send({ language: updated });
+  fastify.put('/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+    try {
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'manage');
+      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
+
+      const { code } = request.params;
+      const { name, is_active, is_default } = request.body || {};
+      const result = await updateLanguage(fastify.pg, code, { name, is_active, is_default });
+
+      if (result.error === 'language_not_found') {
+        return reply.code(404).send({ error: 'language_not_found' });
+      }
+
+      if (result.error) {
+        return reply.code(400).send({ error: result.error });
+      }
+
+      return reply.send({ language: result.language });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
+    }
+  });
+
+  fastify.delete('/i18n/languages/:code', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+    try {
+      const allowed = await fastify.canAccess(request.user, 'i18n.languages', 'manage');
+      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
+
+      const { code } = request.params;
+      const result = await deleteLanguage(fastify.pg, code);
+
+      if (result.error === 'language_not_found') {
+        return reply.code(404).send({ error: 'language_not_found' });
+      }
+
+      if (result.error) {
+        return reply.code(400).send({ error: result.error });
+      }
+
+      return reply.code(204).send();
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
+    }
   });
 
   fastify.get('/i18n/translations', async (request, reply) => {
-    const languages = await listLanguages(fastify.pg);
-    const defaultLanguage = await getDefaultLanguage(fastify.pg);
-    const translations = await loadTranslations(fastify.pg);
-    return reply.send({ languages, defaultLanguage, translations });
-  });
+    try {
+      const hasUser = await optionalVerify(fastify, request);
+      if (hasUser) {
+        const allowed = await fastify.canAccess(request.user, 'i18n.translations', 'view');
+        if (!allowed) return reply.code(403).send({ error: 'forbidden' });
+      }
 
-  fastify.post('/i18n/keys', { preHandler: fastify.verifyJWT }, async (request, reply) => {
-    const { key, description } = request.body || {};
-    if (!key) return reply.code(400).send({ error: 'invalid_request' });
-
-    await upsertKey(fastify.pg, key, description || null);
-    return reply.code(201).send({ key });
-  });
-
-  fastify.post('/i18n/translations', { preHandler: fastify.verifyJWT }, async (request, reply) => {
-    const { key, translations } = request.body || {};
-    if (!key || typeof translations !== 'object') {
-      return reply.code(400).send({ error: 'invalid_request' });
+      const languages = await listLanguages(fastify.pg);
+      const defaultLanguage = await getDefaultLanguage(fastify.pg);
+      const translations = await loadTranslations(fastify.pg);
+      return reply.send({ languages, defaultLanguage, translations });
+    } catch (err) {
+      if (err.statusCode) {
+        return reply.code(err.statusCode).send({ error: err.code || 'unauthorized' });
+      }
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
     }
+  });
 
-    await upsertTranslations(fastify.pg, key, translations);
-    return reply.code(201).send({ saved: true });
+  fastify.put('/i18n/translations', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+    try {
+      const allowed = await fastify.canAccess(request.user, 'i18n.translations', 'manage');
+      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
+
+      const { key, translations, aliases } = request.body || {};
+      if (!key || typeof translations !== 'object') {
+        return reply.code(400).send({ error: 'invalid_request' });
+      }
+
+      await upsertTranslations(fastify.pg, key, translations);
+      if (Array.isArray(aliases) && aliases.length) {
+        await upsertAliases(fastify.pg, key, aliases);
+      }
+      return reply.send({ saved: true });
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
+    }
   });
 }

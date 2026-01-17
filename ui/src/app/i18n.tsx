@@ -3,7 +3,6 @@ import {
   Language,
   TranslationsResponse,
   fetchTranslationsBundle,
-  registerKey,
   upsertTranslation
 } from './api';
 
@@ -87,7 +86,6 @@ export function I18nProvider({ userLanguage, children }: { userLanguage?: string
   };
 
   const registerTranslation = async (key: string, values: Record<string, string>) => {
-    await registerKey(key);
     await upsertTranslation({ key, translations: values });
     await refresh();
   };
