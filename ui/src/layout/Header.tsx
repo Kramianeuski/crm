@@ -4,15 +4,25 @@ import { useI18n } from '../app/i18n';
 type Props = {
   user: User | null;
   onLogout: () => void;
+  onToggleSidebar: () => void;
+  sidebarOpen: boolean;
 };
 
-export default function Header({ user, onLogout }: Props) {
+export default function Header({ user, onLogout, onToggleSidebar, sidebarOpen }: Props) {
   const { t, language, languages, setLanguage } = useI18n();
   const activeLanguages = languages.filter((lang) => lang.is_active);
 
   return (
     <header className="header">
       <div className="header__brand">
+        <button
+          className="button button-secondary header__toggle"
+          type="button"
+          onClick={onToggleSidebar}
+          aria-label="Toggle navigation"
+        >
+          {sidebarOpen ? '☰' : '☰'}
+        </button>
         <div className="logo-mark">CRM</div>
         <div>
           <p className="brand-title">{t('layout_brand_title')}</p>
