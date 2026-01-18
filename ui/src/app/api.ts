@@ -43,6 +43,49 @@ export type RolePermission = {
   scope: string;
 };
 
+export type UserSummary = {
+  id: number | string;
+  email: string;
+  login?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  company_name?: string | null;
+  display_name?: string | null;
+  lang?: string | null;
+  is_active?: boolean;
+  roles?: string[];
+  groups?: string[];
+  departments?: { id: string; name?: string; name_key?: string; code?: string }[];
+};
+
+export type UserDetail = UserSummary & {
+  permissions?: string[];
+};
+
+export type Department = {
+  id: string;
+  code: string;
+  name?: string;
+  name_key?: string;
+  parent_id?: string | null;
+  manager_user_id?: string | null;
+  manager?: { id: string; email?: string; first_name?: string; last_name?: string };
+  users?: { id: string; email?: string }[];
+};
+
+export type AuditLog = {
+  id: string;
+  event?: string;
+  event_type?: string;
+  user?: string;
+  actor?: { id?: string; email?: string };
+  entity?: string;
+  entity_type?: string;
+  entity_id?: string | null;
+  payload?: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type Role = {
   id: string;
   code: string;
@@ -202,7 +245,7 @@ export async function createLanguage(payload: {
 
 export async function updateLanguage(code: string, payload: Partial<Language>): Promise<Language> {
   const { language } = await apiFetch<{ language: Language }>(`/core/v1/i18n/languages/${code}`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(payload)
   });
   return language;
@@ -234,4 +277,81 @@ export async function fetchRoles(): Promise<Role[]> {
 export async function fetchPermissions(): Promise<Permission[]> {
   const { permissions } = await apiFetch<{ permissions: Permission[] }>('/core/v1/permissions');
   return permissions;
+}
+
+export async function fetchUsers(): Promise<UserSummary[]> {
+  const { users } = await apiFetch<{ users: UserSummary[] }>('/core/v1/users');
+  return users;
+}
+
+export async function fetchUser(id: string): Promise<UserDetail> {
+  const { user } = await apiFetch<{ user: UserDetail }>(`/core/v1/users/${id}`);
+  return user;
+}
+
+export async function updateUser(id: string, payload: Partial<UserDetail>): Promise<UserDetail> {
+  const { user } = await apiFetch<{ user: UserDetail }>(`/core/v1/users/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+  return user;
+}
+
+export async function fetchDepartments(): Promise<Department[]> {
+  const { departments } = await apiFetch<{ departments: Department[] }>('/core/v1/departments');
+  return departments;
+}
+
+export async function createDepartment(payload: {
+  code: string;
+  name?: string;
+  name_key?: string;
+  parent_id?: string | null;
+  manager_user_id?: string | null;
+}): Promise<Department> {
+  const { department } = await apiFetch<{ department: Department }>('/core/v1/departments', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return department;
+}
+
+export async function updateDepartment(
+  id: string,
+  payload: Partial<Department>
+): Promise<Department> {
+  const { department } = await apiFetch<{ department: Department }>(`/core/v1/departments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload)
+  });
+  return department;
+}
+
+export async function fetchAuditLogs(params: {
+  from?: string;
+  to?: string;
+  event?: string;
+  q?: string;
+  limit?: number;
+  page?: number;
+}): Promise<{ logs: AuditLog[]; total?: number }> {
+  const query = new URLSearchParams();
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  if (params.event) query.set('event', params.event);
+  if (params.q) query.set('q', params.q);
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.page) query.set('page', String(params.page));
+
+  const data = await apiFetch<{
+    logs?: AuditLog[];
+    audit?: AuditLog[];
+    items?: AuditLog[];
+    total?: number;
+    pagination?: { total?: number };
+  }>(`/core/v1/audit?${query.toString()}`);
+
+  const logs = data.logs || data.audit || data.items || [];
+  const total = data.total ?? data.pagination?.total;
+  return { logs, total };
 }
