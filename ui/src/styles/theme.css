@@ -237,6 +237,19 @@ a {
 .nav-group__items {
   display: flex;
   flex-direction: column;
+  gap: 6px;
+  padding-left: 4px;
+}
+
+.nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-section__items {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
   padding-left: 12px;
 }
@@ -284,6 +297,12 @@ a {
 .nav-link--child {
   font-size: 14px;
   font-weight: 500;
+}
+
+.nav-link--section {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 12px;
 }
 
 .card {
@@ -450,6 +469,12 @@ a {
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .table-wrapper {

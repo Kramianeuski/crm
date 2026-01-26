@@ -4,6 +4,7 @@ import AuthGuard from './AuthGuard';
 import Shell from '../layout/Shell';
 import Login from '../pages/Login';
 import Settings from '../pages/Settings';
+import UserProfile from '../pages/UserProfile';
 import { User, fetchCurrentUser, tokenStore } from './api';
 import { I18nProvider, useI18n } from './i18n';
 
@@ -103,6 +104,8 @@ function AppContent({ booting, onAuthenticated, onLogout, contextValue, user }: 
         <Route element={<AuthGuard user={user} onLogout={onLogout} />}>
           <Route element={<Shell user={user} onLogout={onLogout} />}>
             <Route path="/settings" element={<Settings />} />
+            <Route path="/users/:id" element={<UserProfile />} />
+            <Route path="/users/:id/edit" element={<UserProfile />} />
             <Route path="/" element={<Navigate to="/settings" replace />} />
           </Route>
         </Route>

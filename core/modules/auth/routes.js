@@ -23,6 +23,12 @@ export default async function authRoutes(fastify) {
         groups: result.groups.map(g => g.code)
       });
 
+      await fastify.audit.logEvent(
+        'auth_login',
+        { email: result.user.email },
+        { actorUserId: result.user.id, entityType: 'user', entityId: result.user.id }
+      );
+
       return reply.send({ token });
     } catch (err) {
       request.log.error(err);

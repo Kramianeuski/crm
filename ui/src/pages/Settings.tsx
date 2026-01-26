@@ -7,21 +7,22 @@ import {
   Language,
   Permission,
   Role,
-  UserDetail,
+  SystemLog,
   UserSummary,
   createDepartment,
   createLanguage,
+  createUser,
+  deleteUser,
   fetchAuditLogs,
   fetchDepartments,
   fetchPermissions,
   fetchRoles,
   fetchSettings,
-  fetchUser,
+  fetchSystemLogs,
   fetchUsers,
   updateDepartment,
   updateLanguage,
-  updateSettings,
-  updateUser
+  updateSettings
 } from '../app/api';
 import { NAV_GROUPS } from '../app/navigation';
 import { useI18n } from '../app/i18n';
@@ -49,16 +50,22 @@ export default function Settings() {
   const auth = useContext(AuthContext);
   const { t } = useI18n();
   const location = useLocation();
-  const navigate = useNavigate();
 
   if (!auth) {
     throw new Error('AuthContext not available');
   }
 
   const permissions = auth.user?.permissions ?? [];
-  const navItems = useMemo(() => NAV_GROUPS.flatMap((group) => group.items), []);
+  const navItems = useMemo(
+    () => NAV_GROUPS.flatMap((group) => group.sections.flatMap((section) => section.items)),
+    []
+  );
   const permittedNav = navItems.filter((item) => hasPermission(item.permission, permissions));
-  const [active, setActive] = useState<string>(permittedNav[0]?.key ?? 'system');
+  const settingsNav = useMemo(
+    () => permittedNav.filter((item) => item.path.startsWith('/settings')),
+    [permittedNav]
+  );
+  const [active, setActive] = useState<string>(settingsNav[0]?.key ?? 'system-general');
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const notify = useCallback((message: string, variant: Toast['variant']) => {
@@ -70,18 +77,22 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
-    const allowedKeys = permittedNav.map((item) => item.key);
+    const allowedKeys = settingsNav.map((item) => item.key);
     const hashKey = location.hash.replace('#', '');
     if (hashKey && allowedKeys.includes(hashKey) && hashKey !== active) {
       setActive(hashKey);
       return;
     }
+    if (!hashKey && allowedKeys.length > 0 && active !== allowedKeys[0]) {
+      setActive(allowedKeys[0]);
+      return;
+    }
     if (!allowedKeys.includes(active) && allowedKeys.length > 0) {
       setActive(allowedKeys[0]);
     }
-  }, [active, location.hash, permittedNav]);
+  }, [active, location.hash, settingsNav]);
 
-  if (permittedNav.length === 0) {
+  if (settingsNav.length === 0) {
     return (
       <div className="page">
         <div className="card">
@@ -102,53 +113,26 @@ export default function Settings() {
         <span className="badge">{t('settings_badge_admin')}</span>
       </div>
 
-      <div className="settings-layout">
-        <nav className="settings-nav">
-          {NAV_GROUPS.map((group) => {
-            const groupItems = group.items.filter((item) =>
-              hasPermission(item.permission, permissions)
-            );
-            if (groupItems.length === 0) return null;
-            return (
-              <div key={group.key} className="settings-nav__group">
-                <p className="settings-nav__title">{t(group.labelKey)}</p>
-                {groupItems.map((item) => (
-                  <button
-                    key={item.key}
-                    className={`settings-nav__item ${active === item.key ? 'is-active' : ''}`}
-                    type="button"
-                    onClick={() => {
-                      setActive(item.key);
-                      navigate(`/settings#${item.key}`, { replace: true });
-                    }}
-                  >
-                    <span>{t(item.labelKey)}</span>
-                    <span className="muted">{item.permission}</span>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </nav>
-
-        <div className="settings-content">
-          {active === 'system' && (
-            <SystemSection permissions={permissions} onNotify={notify} />
-          )}
-          {active === 'users' && (
-            <UsersSection permissions={permissions} onNotify={notify} />
-          )}
-          {active === 'departments' && (
-            <DepartmentsSection permissions={permissions} onNotify={notify} />
-          )}
-          {active === 'roles' && <RolesSection permissions={permissions} />}
-          {active === 'languages' && (
-            <LanguagesSection permissions={permissions} onNotify={notify} />
-          )}
-          {active === 'audit' && (
-            <AuditSection permissions={permissions} onNotify={notify} />
-          )}
-        </div>
+      <div className="settings-content">
+        {active === 'system-general' && (
+          <SystemSection permissions={permissions} onNotify={notify} section="general" />
+        )}
+        {active === 'system-security' && (
+          <SystemSection permissions={permissions} onNotify={notify} section="security" />
+        )}
+        {active === 'users-list' && (
+          <UsersSection permissions={permissions} onNotify={notify} />
+        )}
+        {active === 'departments' && (
+          <DepartmentsSection permissions={permissions} onNotify={notify} />
+        )}
+        {active === 'roles' && <RolesSection permissions={permissions} />}
+        {active === 'languages' && (
+          <LanguagesSection permissions={permissions} onNotify={notify} />
+        )}
+        {active === 'audit' && (
+          <AuditSection permissions={permissions} onNotify={notify} />
+        )}
       </div>
 
       {toasts.length > 0 && (
@@ -166,10 +150,12 @@ export default function Settings() {
 
 function SystemSection({
   permissions,
-  onNotify
+  onNotify,
+  section
 }: {
   permissions: string[];
   onNotify: (message: string, variant: Toast['variant']) => void;
+  section: 'general' | 'security';
 }) {
   const { t, languages, defaultLanguage } = useI18n();
   const canEditSystem = hasPermission('settings.system.edit', permissions);
@@ -245,210 +231,216 @@ function SystemSection({
 
   return (
     <div className="stack">
-      <div className="card">
-        <div className="card__header">
-          <div>
-            <p className="muted">{t('settings_system_label')}</p>
-            <h2 className="card__title">{t('settings_system_general')}</h2>
-          </div>
-          <div className="pill">GET /api/core/v1/settings</div>
-        </div>
-        {canEditSystem ? (
-          <form className="form two-column" onSubmit={handleGeneralSubmit}>
-            <label className="form__label" htmlFor="systemName">
-              {t('settings_system_name')}
-            </label>
-            <input
-              id="systemName"
-              className="input"
-              value={generalState.systemName}
-              onChange={(e) =>
-                setGeneralState({ ...generalState, systemName: e.target.value })
-              }
-            />
-
-            <label className="form__label" htmlFor="defaultLanguage">
-              {t('settings_system_default_language')}
-            </label>
-            <select
-              id="defaultLanguage"
-              className="input"
-              value={generalState.defaultLanguage}
-              onChange={(e) =>
-                setGeneralState({ ...generalState, defaultLanguage: e.target.value })
-              }
-            >
-              {languages
-                .filter((lang) => lang.is_active)
-                .map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-            </select>
-
-            <label className="form__label" htmlFor="timezone">
-              {t('settings_system_timezone')}
-            </label>
-            <input
-              id="timezone"
-              className="input"
-              value={generalState.timezone}
-              onChange={(e) => setGeneralState({ ...generalState, timezone: e.target.value })}
-              placeholder="UTC"
-            />
-
-            <label className="form__label" htmlFor="developerMode">
-              {t('settings_system_developer_mode')}
-            </label>
-            <label className="toggle">
-              <input
-                id="developerMode"
-                type="checkbox"
-                checked={generalState.developerMode}
-                onChange={(e) =>
-                  setGeneralState({ ...generalState, developerMode: e.target.checked })
-                }
-              />
-              <span>
-                {generalState.developerMode
-                  ? t('settings_system_developer_mode_on')
-                  : t('settings_system_developer_mode_off')}
-              </span>
-            </label>
-
-            <div className="form__actions">
-              <button className="button button-primary" type="submit">
-                {t('settings_system_save_general')}
-              </button>
+      {section === 'general' && (
+        <div className="card">
+          <div className="card__header">
+            <div>
+              <p className="muted">{t('settings_system_label')}</p>
+              <h2 className="card__title">{t('settings_system_general')}</h2>
             </div>
-          </form>
-        ) : (
-          <div className="read-only-grid">
-            <ReadOnlyField label={t('settings_system_name')} value={generalState.systemName} />
-            <ReadOnlyField
-              label={t('settings_system_default_language')}
-              value={generalState.defaultLanguage}
-            />
-            <ReadOnlyField label={t('settings_system_timezone')} value={generalState.timezone} />
-            <ReadOnlyField
-              label={t('settings_system_developer_mode')}
-              value={
-                generalState.developerMode
-                  ? t('settings_system_developer_mode_on')
-                  : t('settings_system_developer_mode_off')
-              }
-            />
+            <div className="pill">GET /api/core/v1/settings</div>
           </div>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="card__header">
-          <div>
-            <p className="muted">{t('settings_system_label')}</p>
-            <h2 className="card__title">{t('settings_system_security')}</h2>
-          </div>
-          <div className="pill">GET /api/core/v1/settings</div>
-        </div>
-        {canEditAccess ? (
-          <form className="form two-column" onSubmit={handleSecuritySubmit}>
-            <label className="form__label" htmlFor="localPasswords">
-              {t('settings_security_local_passwords')}
-            </label>
-            <label className="toggle">
+          {canEditSystem ? (
+            <form className="form two-column" onSubmit={handleGeneralSubmit}>
+              <label className="form__label" htmlFor="systemName">
+                {t('settings_system_name')}
+              </label>
               <input
-                id="localPasswords"
-                type="checkbox"
-                checked={securityState.enableLocalPasswords}
+                id="systemName"
+                className="input"
+                value={generalState.systemName}
                 onChange={(e) =>
-                  setSecurityState({
-                    ...securityState,
-                    enableLocalPasswords: e.target.checked
-                  })
+                  setGeneralState({ ...generalState, systemName: e.target.value })
                 }
               />
-              <span>
-                {securityState.enableLocalPasswords ? t('status_enabled') : t('status_disabled')}
-              </span>
-            </label>
 
-            <label className="form__label" htmlFor="enableSSO">
-              {t('settings_security_sso')}
-            </label>
-            <label className="toggle">
-              <input
-                id="enableSSO"
-                type="checkbox"
-                checked={securityState.enableSSO}
+              <label className="form__label" htmlFor="defaultLanguage">
+                {t('settings_system_default_language')}
+              </label>
+              <select
+                id="defaultLanguage"
+                className="input"
+                value={generalState.defaultLanguage}
                 onChange={(e) =>
-                  setSecurityState({ ...securityState, enableSSO: e.target.checked })
+                  setGeneralState({ ...generalState, defaultLanguage: e.target.value })
+                }
+              >
+                {languages
+                  .filter((lang) => lang.is_active)
+                  .map((lang) => (
+                    <option key={lang.code} value={lang.code}>
+                      {lang.name}
+                    </option>
+                  ))}
+              </select>
+
+              <label className="form__label" htmlFor="timezone">
+                {t('settings_system_timezone')}
+              </label>
+              <input
+                id="timezone"
+                className="input"
+                value={generalState.timezone}
+                onChange={(e) =>
+                  setGeneralState({ ...generalState, timezone: e.target.value })
+                }
+                placeholder="UTC"
+              />
+
+              <label className="form__label" htmlFor="developerMode">
+                {t('settings_system_developer_mode')}
+              </label>
+              <label className="toggle">
+                <input
+                  id="developerMode"
+                  type="checkbox"
+                  checked={generalState.developerMode}
+                  onChange={(e) =>
+                    setGeneralState({ ...generalState, developerMode: e.target.checked })
+                  }
+                />
+                <span>
+                  {generalState.developerMode
+                    ? t('settings_system_developer_mode_on')
+                    : t('settings_system_developer_mode_off')}
+                </span>
+              </label>
+
+              <div className="form__actions">
+                <button className="button button-primary" type="submit">
+                  {t('settings_system_save_general')}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="read-only-grid">
+              <ReadOnlyField label={t('settings_system_name')} value={generalState.systemName} />
+              <ReadOnlyField
+                label={t('settings_system_default_language')}
+                value={generalState.defaultLanguage}
+              />
+              <ReadOnlyField label={t('settings_system_timezone')} value={generalState.timezone} />
+              <ReadOnlyField
+                label={t('settings_system_developer_mode')}
+                value={
+                  generalState.developerMode
+                    ? t('settings_system_developer_mode_on')
+                    : t('settings_system_developer_mode_off')
                 }
               />
-              <span>{securityState.enableSSO ? t('status_enabled') : t('status_disabled')}</span>
-            </label>
-
-            <label className="form__label" htmlFor="jwtTtl">
-              {t('settings_security_jwt_ttl')}
-            </label>
-            <input
-              id="jwtTtl"
-              className="input"
-              type="number"
-              min="5"
-              value={securityState.jwtTtl}
-              onChange={(e) =>
-                setSecurityState({ ...securityState, jwtTtl: Number(e.target.value) })
-              }
-            />
-
-            <label className="form__label" htmlFor="multipleSessions">
-              {t('settings_security_multiple_sessions')}
-            </label>
-            <label className="toggle">
-              <input
-                id="multipleSessions"
-                type="checkbox"
-                checked={securityState.allowMultipleSessions}
-                onChange={(e) =>
-                  setSecurityState({
-                    ...securityState,
-                    allowMultipleSessions: e.target.checked
-                  })
-                }
-              />
-              <span>
-                {securityState.allowMultipleSessions ? t('status_enabled') : t('status_disabled')}
-              </span>
-            </label>
-
-            <div className="form__actions">
-              <button className="button button-primary" type="submit">
-                {t('settings_security_save')}
-              </button>
             </div>
-          </form>
-        ) : (
-          <div className="read-only-grid">
-            <ReadOnlyField
-              label={t('settings_security_local_passwords')}
-              value={securityState.enableLocalPasswords ? t('status_enabled') : t('status_disabled')}
-            />
-            <ReadOnlyField
-              label={t('settings_security_sso')}
-              value={securityState.enableSSO ? t('status_enabled') : t('status_disabled')}
-            />
-            <ReadOnlyField
-              label={t('settings_security_jwt_ttl')}
-              value={`${securityState.jwtTtl}`}
-            />
-            <ReadOnlyField
-              label={t('settings_security_multiple_sessions')}
-              value={securityState.allowMultipleSessions ? t('status_enabled') : t('status_disabled')}
-            />
+          )}
+        </div>
+      )}
+
+      {section === 'security' && (
+        <div className="card">
+          <div className="card__header">
+            <div>
+              <p className="muted">{t('settings_system_label')}</p>
+              <h2 className="card__title">{t('settings_system_security')}</h2>
+            </div>
+            <div className="pill">GET /api/core/v1/settings</div>
           </div>
-        )}
-      </div>
+          {canEditAccess ? (
+            <form className="form two-column" onSubmit={handleSecuritySubmit}>
+              <label className="form__label" htmlFor="localPasswords">
+                {t('settings_security_local_passwords')}
+              </label>
+              <label className="toggle">
+                <input
+                  id="localPasswords"
+                  type="checkbox"
+                  checked={securityState.enableLocalPasswords}
+                  onChange={(e) =>
+                    setSecurityState({
+                      ...securityState,
+                      enableLocalPasswords: e.target.checked
+                    })
+                  }
+                />
+                <span>
+                  {securityState.enableLocalPasswords ? t('status_enabled') : t('status_disabled')}
+                </span>
+              </label>
+
+              <label className="form__label" htmlFor="enableSSO">
+                {t('settings_security_sso')}
+              </label>
+              <label className="toggle">
+                <input
+                  id="enableSSO"
+                  type="checkbox"
+                  checked={securityState.enableSSO}
+                  onChange={(e) =>
+                    setSecurityState({ ...securityState, enableSSO: e.target.checked })
+                  }
+                />
+                <span>{securityState.enableSSO ? t('status_enabled') : t('status_disabled')}</span>
+              </label>
+
+              <label className="form__label" htmlFor="jwtTtl">
+                {t('settings_security_jwt_ttl')}
+              </label>
+              <input
+                id="jwtTtl"
+                className="input"
+                type="number"
+                min="5"
+                value={securityState.jwtTtl}
+                onChange={(e) =>
+                  setSecurityState({ ...securityState, jwtTtl: Number(e.target.value) })
+                }
+              />
+
+              <label className="form__label" htmlFor="multipleSessions">
+                {t('settings_security_multiple_sessions')}
+              </label>
+              <label className="toggle">
+                <input
+                  id="multipleSessions"
+                  type="checkbox"
+                  checked={securityState.allowMultipleSessions}
+                  onChange={(e) =>
+                    setSecurityState({
+                      ...securityState,
+                      allowMultipleSessions: e.target.checked
+                    })
+                  }
+                />
+                <span>
+                  {securityState.allowMultipleSessions ? t('status_enabled') : t('status_disabled')}
+                </span>
+              </label>
+
+              <div className="form__actions">
+                <button className="button button-primary" type="submit">
+                  {t('settings_security_save')}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="read-only-grid">
+              <ReadOnlyField
+                label={t('settings_security_local_passwords')}
+                value={securityState.enableLocalPasswords ? t('status_enabled') : t('status_disabled')}
+              />
+              <ReadOnlyField
+                label={t('settings_security_sso')}
+                value={securityState.enableSSO ? t('status_enabled') : t('status_disabled')}
+              />
+              <ReadOnlyField
+                label={t('settings_security_jwt_ttl')}
+                value={`${securityState.jwtTtl}`}
+              />
+              <ReadOnlyField
+                label={t('settings_security_multiple_sessions')}
+                value={securityState.allowMultipleSessions ? t('status_enabled') : t('status_disabled')}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -460,16 +452,26 @@ function UsersSection({
   permissions: string[];
   onNotify: (message: string, variant: Toast['variant']) => void;
 }) {
-  const { t, languages } = useI18n();
+  const { t } = useI18n();
+  const navigate = useNavigate();
   const canViewUsers = hasPermission('users.view', permissions);
   const canManageUsers = hasPermission('users.manage', permissions);
   const canAssignRoles = hasPermission('users.roles.assign', permissions);
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<UserDetail | null>(null);
-  const [editUser, setEditUser] = useState<UserDetail | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [deleteTargetIds, setDeleteTargetIds] = useState<string[] | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+    role: '',
+    is_active: true,
+    password: ''
+  });
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -490,6 +492,12 @@ function UsersSection({
   }, [canViewUsers, loadUsers]);
 
   useEffect(() => {
+    setSelectedIds((prev) =>
+      prev.filter((id) => users.some((user) => String(user.id) === id))
+    );
+  }, [users]);
+
+  useEffect(() => {
     if (!canAssignRoles) return;
     const loadRoles = async () => {
       try {
@@ -503,46 +511,53 @@ function UsersSection({
     loadRoles();
   }, [canAssignRoles, onNotify]);
 
-  useEffect(() => {
-    if (!selectedUserId) {
-      setSelectedUser(null);
-      setEditUser(null);
-      return;
-    }
-    const loadUser = async () => {
-      try {
-        const data = await fetchUser(selectedUserId);
-        setSelectedUser(data);
-        setEditUser(data);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        onNotify(message, 'error');
-      }
-    };
-    loadUser();
-  }, [selectedUserId, onNotify]);
-
-  const handleUserSave = async () => {
-    if (!editUser || !selectedUser) return;
-    if (!canManageUsers && !canAssignRoles) return;
-
+  const handleCreateUser = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!canManageUsers) return;
+    setSaving(true);
     try {
-      const payload: Partial<UserDetail> = {
-        first_name: editUser.first_name ?? null,
-        last_name: editUser.last_name ?? null,
-        company_name: editUser.company_name ?? null,
-        lang: editUser.lang ?? null,
-        is_active: editUser.is_active,
-        roles: editUser.roles
-      };
-      const updated = await updateUser(String(selectedUser.id), payload);
-      setSelectedUser(updated);
-      setEditUser(updated);
+      await createUser({
+        email: createForm.email,
+        first_name: createForm.first_name || undefined,
+        last_name: createForm.last_name || undefined,
+        roles: createForm.role ? [createForm.role] : [],
+        is_active: createForm.is_active,
+        password: createForm.password || undefined
+      });
+      setCreateOpen(false);
+      setCreateForm({
+        email: '',
+        first_name: '',
+        last_name: '',
+        role: '',
+        is_active: true,
+        password: ''
+      });
       await loadUsers();
-      onNotify('User updated.', 'success');
+      onNotify('User created.', 'success');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       onNotify(message, 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUsers = async () => {
+    if (!deleteTargetIds || deleteTargetIds.length === 0) return;
+    if (!canManageUsers) return;
+    setSaving(true);
+    try {
+      await Promise.all(deleteTargetIds.map((id) => deleteUser(id)));
+      setSelectedIds((prev) => prev.filter((id) => !deleteTargetIds.includes(id)));
+      setDeleteTargetIds(null);
+      await loadUsers();
+      onNotify('Users deleted.', 'success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      onNotify(message, 'error');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -564,6 +579,8 @@ function UsersSection({
     );
   }
 
+  const allSelected = users.length > 0 && selectedIds.length === users.length;
+
   return (
     <div className="stack">
       <div className="card">
@@ -572,12 +589,46 @@ function UsersSection({
             <p className="muted">{t('settings_users_label')}</p>
             <h2 className="card__title">{t('settings_users_title')}</h2>
           </div>
-          <div className="pill">GET /api/core/v1/users</div>
+          <div className="actions-row">
+            {selectedIds.length > 0 && (
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => setDeleteTargetIds(selectedIds)}
+              >
+                Delete selected ({selectedIds.length})
+              </button>
+            )}
+            {canManageUsers && (
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={() => setCreateOpen(true)}
+              >
+                {t('settings_users_create')}
+              </button>
+            )}
+            <div className="pill">GET /api/core/v1/users</div>
+          </div>
         </div>
         <div className="table-wrapper">
           <table className="table">
             <thead>
               <tr>
+                <th>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all users"
+                    checked={allSelected}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setSelectedIds(users.map((user) => String(user.id)));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                  />
+                </th>
                 <th>{t('settings_users_email')}</th>
                 <th>{t('settings_users_first_name')}</th>
                 <th>{t('settings_users_last_name')}</th>
@@ -587,19 +638,20 @@ function UsersSection({
                 <th>{t('settings_users_roles')}</th>
                 <th>{t('settings_users_groups')}</th>
                 <th>{t('settings_users_department')}</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading && (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={11} className="muted">
                     Loading...
                   </td>
                 </tr>
               )}
               {!loading && users.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={11} className="muted">
                     No users found.
                   </td>
                 </tr>
@@ -607,10 +659,25 @@ function UsersSection({
               {users.map((user) => (
                 <tr key={user.id}>
                   <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${user.email}`}
+                      checked={selectedIds.includes(String(user.id))}
+                      onChange={(event) => {
+                        const id = String(user.id);
+                        setSelectedIds((prev) =>
+                          event.target.checked
+                            ? [...prev, id]
+                            : prev.filter((value) => value !== id)
+                        );
+                      }}
+                    />
+                  </td>
+                  <td>
                     <button
                       className="button button-ghost"
                       type="button"
-                      onClick={() => setSelectedUserId(String(user.id))}
+                      onClick={() => navigate(`/users/${user.id}`)}
                     >
                       {user.email}
                     </button>
@@ -645,177 +712,179 @@ function UsersSection({
                     </div>
                   </td>
                   <td>{getUserDepartments(user)}</td>
+                  <td>
+                    <div className="actions-row">
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        onClick={() => navigate(`/users/${user.id}/edit`)}
+                      >
+                        Edit
+                      </button>
+                      {canManageUsers && (
+                        <button
+                          className="button button-ghost"
+                          type="button"
+                          onClick={() => setDeleteTargetIds([String(user.id)])}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
-
-      {selectedUserId && (
-        <div className="drawer-overlay" role="dialog" aria-modal="true">
-          <div className="drawer">
-            <div className="drawer__header">
+      {createOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="card__header">
               <div>
                 <p className="muted">{t('settings_users_label')}</p>
-                <h2 className="card__title">
-                  {selectedUser?.email || t('settings_users_title')}
-                </h2>
+                <h2 className="card__title">{t('settings_users_create')}</h2>
+              </div>
+              <button className="button button-secondary" type="button" onClick={() => setCreateOpen(false)}>
+                Close
+              </button>
+            </div>
+            <form className="form two-column" onSubmit={handleCreateUser}>
+              <label className="form__label" htmlFor="createEmail">
+                {t('settings_users_email')}
+              </label>
+              <input
+                id="createEmail"
+                className="input"
+                type="email"
+                required
+                value={createForm.email}
+                onChange={(event) => setCreateForm({ ...createForm, email: event.target.value })}
+              />
+
+              <label className="form__label" htmlFor="createFirstName">
+                {t('settings_users_first_name')}
+              </label>
+              <input
+                id="createFirstName"
+                className="input"
+                value={createForm.first_name}
+                onChange={(event) =>
+                  setCreateForm({ ...createForm, first_name: event.target.value })
+                }
+              />
+
+              <label className="form__label" htmlFor="createLastName">
+                {t('settings_users_last_name')}
+              </label>
+              <input
+                id="createLastName"
+                className="input"
+                value={createForm.last_name}
+                onChange={(event) =>
+                  setCreateForm({ ...createForm, last_name: event.target.value })
+                }
+              />
+
+              <label className="form__label" htmlFor="createRole">
+                {t('settings_users_roles')}
+              </label>
+              <select
+                id="createRole"
+                className="input"
+                value={createForm.role}
+                disabled={!canAssignRoles}
+                onChange={(event) =>
+                  setCreateForm({ ...createForm, role: event.target.value })
+                }
+              >
+                <option value="">—</option>
+                {roles.map((role) => (
+                  <option key={role.code} value={role.code}>
+                    {role.code}
+                  </option>
+                ))}
+              </select>
+
+              <label className="form__label" htmlFor="createPassword">
+                Password
+              </label>
+              <input
+                id="createPassword"
+                className="input"
+                type="password"
+                value={createForm.password}
+                onChange={(event) =>
+                  setCreateForm({ ...createForm, password: event.target.value })
+                }
+                placeholder="Optional"
+              />
+
+              <label className="form__label" htmlFor="createStatus">
+                {t('settings_users_status')}
+              </label>
+              <label className="toggle">
+                <input
+                  id="createStatus"
+                  type="checkbox"
+                  checked={createForm.is_active}
+                  onChange={(event) =>
+                    setCreateForm({ ...createForm, is_active: event.target.checked })
+                  }
+                />
+                <span>
+                  {createForm.is_active ? t('status_active') : t('status_inactive')}
+                </span>
+              </label>
+
+              <div className="form__actions">
+                <button className="button button-primary" type="submit" disabled={saving}>
+                  {t('settings_users_create')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteTargetIds && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="card__header">
+              <div>
+                <p className="muted">{t('settings_users_label')}</p>
+                <h2 className="card__title">Confirm delete</h2>
               </div>
               <button
                 className="button button-secondary"
                 type="button"
-                onClick={() => setSelectedUserId(null)}
+                onClick={() => setDeleteTargetIds(null)}
               >
                 Close
               </button>
             </div>
-
-            {!selectedUser && <p className="muted">Loading...</p>}
-
-            {selectedUser && editUser && (
-              <div className="stack">
-                <ReadOnlyField label={t('settings_users_email')} value={selectedUser.email} />
-                {!canManageUsers && (
-                  <>
-                    <ReadOnlyField
-                      label={t('settings_users_first_name')}
-                      value={selectedUser.first_name || '—'}
-                    />
-                    <ReadOnlyField
-                      label={t('settings_users_last_name')}
-                      value={selectedUser.last_name || '—'}
-                    />
-                    <ReadOnlyField
-                      label={t('settings_users_company')}
-                      value={selectedUser.company_name || '—'}
-                    />
-                    <ReadOnlyField
-                      label={t('settings_users_language')}
-                      value={selectedUser.lang || '—'}
-                    />
-                  </>
-                )}
-
-                {canManageUsers && (
-                  <form className="form">
-                    <label className="form__label" htmlFor="userFirstName">
-                      {t('settings_users_first_name')}
-                    </label>
-                    <input
-                      id="userFirstName"
-                      className="input"
-                      value={editUser.first_name || ''}
-                      onChange={(event) =>
-                        setEditUser({ ...editUser, first_name: event.target.value })
-                      }
-                    />
-
-                    <label className="form__label" htmlFor="userLastName">
-                      {t('settings_users_last_name')}
-                    </label>
-                    <input
-                      id="userLastName"
-                      className="input"
-                      value={editUser.last_name || ''}
-                      onChange={(event) =>
-                        setEditUser({ ...editUser, last_name: event.target.value })
-                      }
-                    />
-
-                    <label className="form__label" htmlFor="userCompany">
-                      {t('settings_users_company')}
-                    </label>
-                    <input
-                      id="userCompany"
-                      className="input"
-                      value={editUser.company_name || ''}
-                      onChange={(event) =>
-                        setEditUser({ ...editUser, company_name: event.target.value })
-                      }
-                    />
-
-                    <label className="form__label" htmlFor="userLang">
-                      {t('settings_users_language')}
-                    </label>
-                    <select
-                      id="userLang"
-                      className="input"
-                      value={editUser.lang || ''}
-                      onChange={(event) => setEditUser({ ...editUser, lang: event.target.value })}
-                    >
-                      <option value="">—</option>
-                      {languages.map((lang) => (
-                        <option key={lang.code} value={lang.code}>
-                          {lang.name}
-                        </option>
-                      ))}
-                    </select>
-
-                    <label className="form__label" htmlFor="userActive">
-                      {t('settings_users_status')}
-                    </label>
-                    <label className="toggle">
-                      <input
-                        id="userActive"
-                        type="checkbox"
-                        checked={!!editUser.is_active}
-                        onChange={(event) =>
-                          setEditUser({ ...editUser, is_active: event.target.checked })
-                        }
-                      />
-                      <span>
-                        {editUser.is_active ? t('status_active') : t('status_inactive')}
-                      </span>
-                    </label>
-                  </form>
-                )}
-
-                {canAssignRoles && (
-                  <div className="card">
-                    <p className="muted">{t('settings_users_roles')}</p>
-                    <div className="tags">
-                      {roles.map((role) => {
-                        const isChecked = (editUser.roles || []).includes(role.code);
-                        return (
-                          <label key={role.code} className="tag tag-selectable">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(event) => {
-                                const nextRoles = new Set(editUser.roles || []);
-                                if (event.target.checked) {
-                                  nextRoles.add(role.code);
-                                } else {
-                                  nextRoles.delete(role.code);
-                                }
-                                setEditUser({
-                                  ...editUser,
-                                  roles: Array.from(nextRoles)
-                                });
-                              }}
-                            />
-                            <span>{role.code}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {(canManageUsers || canAssignRoles) && (
-                  <div className="drawer__footer">
-                    <button
-                      className="button button-primary"
-                      type="button"
-                      onClick={handleUserSave}
-                    >
-                      Save
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+            <p className="muted">
+              You are about to delete {deleteTargetIds.length}{' '}
+              {deleteTargetIds.length === 1 ? 'user' : 'users'}.
+            </p>
+            <div className="drawer__footer">
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => setDeleteTargetIds(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="button button-primary"
+                type="button"
+                onClick={handleDeleteUsers}
+                disabled={saving}
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1578,6 +1647,7 @@ function AuditSection({
 }) {
   const { t } = useI18n();
   const canViewAudit = hasPermission('audit.view', permissions);
+  const [activeTab, setActiveTab] = useState<'audit' | 'system'>('audit');
   const [filters, setFilters] = useState({
     from: '',
     to: '',
@@ -1586,13 +1656,25 @@ function AuditSection({
     limit: 10,
     page: 1
   });
+  const [systemFilters, setSystemFilters] = useState({
+    from: '',
+    to: '',
+    queue: '',
+    q: '',
+    limit: 10,
+    page: 1
+  });
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [systemLogs, setSystemLogs] = useState<SystemLog[]>([]);
+  const [systemTotal, setSystemTotal] = useState(0);
+  const [systemLoading, setSystemLoading] = useState(false);
+  const [selectedSystemLog, setSelectedSystemLog] = useState<SystemLog | null>(null);
 
   useEffect(() => {
-    if (!canViewAudit) return;
+    if (!canViewAudit || activeTab !== 'audit') return;
     const loadAudit = async () => {
       setLoading(true);
       try {
@@ -1616,11 +1698,42 @@ function AuditSection({
     };
 
     loadAudit();
-  }, [canViewAudit, filters, onNotify]);
+  }, [activeTab, canViewAudit, filters, onNotify]);
+
+  useEffect(() => {
+    if (!canViewAudit || activeTab !== 'system') return;
+    const loadSystem = async () => {
+      setSystemLoading(true);
+      try {
+        const data = await fetchSystemLogs({
+          from: systemFilters.from,
+          to: systemFilters.to,
+          queue: systemFilters.queue,
+          q: systemFilters.q,
+          limit: systemFilters.limit,
+          page: systemFilters.page
+        });
+        setSystemLogs(data.logs);
+        setSystemTotal(data.total ?? data.logs.length);
+        setSelectedSystemLog(data.logs[0] || null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        onNotify(message, 'error');
+      } finally {
+        setSystemLoading(false);
+      }
+    };
+
+    loadSystem();
+  }, [activeTab, canViewAudit, onNotify, systemFilters]);
 
   useEffect(() => {
     setFilters((prev) => ({ ...prev, page: 1 }));
   }, [filters.from, filters.to, filters.event, filters.q, filters.limit]);
+
+  useEffect(() => {
+    setSystemFilters((prev) => ({ ...prev, page: 1 }));
+  }, [systemFilters.from, systemFilters.to, systemFilters.queue, systemFilters.q, systemFilters.limit]);
 
   if (!canViewAudit) {
     return (
@@ -1632,6 +1745,10 @@ function AuditSection({
   }
 
   const totalPages = Math.max(1, Math.ceil((total || logs.length) / filters.limit));
+  const systemTotalPages = Math.max(
+    1,
+    Math.ceil((systemTotal || systemLogs.length) / systemFilters.limit)
+  );
 
   return (
     <div className="stack">
@@ -1641,143 +1758,313 @@ function AuditSection({
             <p className="muted">{t('settings_audit_label')}</p>
             <h2 className="card__title">{t('settings_audit_title')}</h2>
           </div>
-          <div className="pill">GET /api/core/v1/audit</div>
-        </div>
-
-        <div className="filters">
-          <label>
-            {t('settings_audit_filter_from')}
-            <input
-              type="date"
-              className="input"
-              value={filters.from}
-              onChange={(e) => setFilters({ ...filters, from: e.target.value })}
-            />
-          </label>
-          <label>
-            {t('settings_audit_filter_to')}
-            <input
-              type="date"
-              className="input"
-              value={filters.to}
-              onChange={(e) => setFilters({ ...filters, to: e.target.value })}
-            />
-          </label>
-          <label>
-            {t('settings_audit_filter_event')}
-            <select
-              className="input"
-              value={filters.event}
-              onChange={(e) => setFilters({ ...filters, event: e.target.value })}
-            >
-              <option value="">{t('settings_audit_filter_any')}</option>
-              {Array.from(new Set(logs.map((log) => log.event_type || log.event || '')))
-                .filter(Boolean)
-                .map((event) => (
-                  <option key={event} value={event}>
-                    {event}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            {t('settings_audit_filter_search')}
-            <input
-              type="search"
-              className="input"
-              placeholder={t('settings_audit_filter_search')}
-              value={filters.q}
-              onChange={(e) => setFilters({ ...filters, q: e.target.value })}
-            />
-          </label>
-          <label>
-            {t('settings_audit_filter_limit')}
-            <input
-              type="number"
-              min="1"
-              className="input"
-              value={filters.limit}
-              onChange={(e) => setFilters({ ...filters, limit: Number(e.target.value) })}
-            />
-          </label>
-        </div>
-
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>{t('settings_audit_table_date')}</th>
-                <th>{t('settings_audit_table_event')}</th>
-                <th>{t('settings_audit_table_user')}</th>
-                <th>{t('settings_audit_table_entity')}</th>
-                <th>{t('settings_audit_table_payload')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="muted">
-                    Loading...
-                  </td>
-                </tr>
-              )}
-              {!loading && logs.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="muted">
-                    No audit logs found.
-                  </td>
-                </tr>
-              )}
-              {logs.map((log) => (
-                <tr key={log.id} className={selectedLog?.id === log.id ? 'is-selected' : ''}>
-                  <td>{new Date(log.created_at).toLocaleString()}</td>
-                  <td>{log.event_type || log.event}</td>
-                  <td>{log.user || log.actor?.email || '—'}</td>
-                  <td>{
-                    log.entity ||
-                    (log.entity_type ? `${log.entity_type}${log.entity_id ? `:${log.entity_id}` : ''}` : '—')
-                  }</td>
-                  <td>
-                    <button
-                      className="button button-ghost"
-                      type="button"
-                      onClick={() => setSelectedLog(log)}
-                    >
-                      {JSON.stringify(log.payload || {}).slice(0, 60)}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="pagination">
-          <div>{t('settings_audit_page', { page: filters.page, total: totalPages })}</div>
           <div className="actions-row">
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() => setFilters({ ...filters, page: Math.max(1, filters.page - 1) })}
-              disabled={filters.page === 1}
-            >
-              {t('common_prev')}
-            </button>
-            <button
-              className="button button-secondary"
-              type="button"
-              onClick={() =>
-                setFilters({ ...filters, page: Math.min(totalPages, filters.page + 1) })
-              }
-              disabled={filters.page >= totalPages}
-            >
-              {t('common_next')}
-            </button>
+            <div className="button-group">
+              <button
+                className={`button ${activeTab === 'audit' ? 'button-primary' : 'button-secondary'}`}
+                type="button"
+                onClick={() => setActiveTab('audit')}
+              >
+                Audit
+              </button>
+              <button
+                className={`button ${activeTab === 'system' ? 'button-primary' : 'button-secondary'}`}
+                type="button"
+                onClick={() => setActiveTab('system')}
+              >
+                System logs
+              </button>
+            </div>
+            <div className="pill">
+              {activeTab === 'audit'
+                ? 'GET /api/core/v1/audit'
+                : 'GET /api/core/v1/logs/system'}
+            </div>
           </div>
         </div>
+
+        {activeTab === 'audit' ? (
+          <div className="filters">
+            <label>
+              {t('settings_audit_filter_from')}
+              <input
+                type="date"
+                className="input"
+                value={filters.from}
+                onChange={(e) => setFilters({ ...filters, from: e.target.value })}
+              />
+            </label>
+            <label>
+              {t('settings_audit_filter_to')}
+              <input
+                type="date"
+                className="input"
+                value={filters.to}
+                onChange={(e) => setFilters({ ...filters, to: e.target.value })}
+              />
+            </label>
+            <label>
+              {t('settings_audit_filter_event')}
+              <select
+                className="input"
+                value={filters.event}
+                onChange={(e) => setFilters({ ...filters, event: e.target.value })}
+              >
+                <option value="">{t('settings_audit_filter_any')}</option>
+                {Array.from(new Set(logs.map((log) => log.event_type || log.event || '')))
+                  .filter(Boolean)
+                  .map((event) => (
+                    <option key={event} value={event}>
+                      {event}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              {t('settings_audit_filter_search')}
+              <input
+                type="search"
+                className="input"
+                placeholder={t('settings_audit_filter_search')}
+                value={filters.q}
+                onChange={(e) => setFilters({ ...filters, q: e.target.value })}
+              />
+            </label>
+            <label>
+              {t('settings_audit_filter_limit')}
+              <input
+                type="number"
+                min="1"
+                className="input"
+                value={filters.limit}
+                onChange={(e) => setFilters({ ...filters, limit: Number(e.target.value) })}
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="filters">
+            <label>
+              From
+              <input
+                type="date"
+                className="input"
+                value={systemFilters.from}
+                onChange={(e) => setSystemFilters({ ...systemFilters, from: e.target.value })}
+              />
+            </label>
+            <label>
+              To
+              <input
+                type="date"
+                className="input"
+                value={systemFilters.to}
+                onChange={(e) => setSystemFilters({ ...systemFilters, to: e.target.value })}
+              />
+            </label>
+            <label>
+              Queue
+              <select
+                className="input"
+                value={systemFilters.queue}
+                onChange={(e) => setSystemFilters({ ...systemFilters, queue: e.target.value })}
+              >
+                <option value="">All</option>
+                {Array.from(new Set(systemLogs.map((log) => log.queue)))
+                  .filter(Boolean)
+                  .map((queue) => (
+                    <option key={queue} value={queue}>
+                      {queue}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Search
+              <input
+                type="search"
+                className="input"
+                placeholder="Search payload"
+                value={systemFilters.q}
+                onChange={(e) => setSystemFilters({ ...systemFilters, q: e.target.value })}
+              />
+            </label>
+            <label>
+              Limit
+              <input
+                type="number"
+                min="1"
+                className="input"
+                value={systemFilters.limit}
+                onChange={(e) =>
+                  setSystemFilters({ ...systemFilters, limit: Number(e.target.value) })
+                }
+              />
+            </label>
+          </div>
+        )}
+
+        {activeTab === 'audit' ? (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>{t('settings_audit_table_date')}</th>
+                  <th>{t('settings_audit_table_event')}</th>
+                  <th>{t('settings_audit_table_user')}</th>
+                  <th>{t('settings_audit_table_entity')}</th>
+                  <th>{t('settings_audit_table_payload')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      Loading...
+                    </td>
+                  </tr>
+                )}
+                {!loading && logs.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="muted">
+                      No audit logs found.
+                    </td>
+                  </tr>
+                )}
+                {logs.map((log) => (
+                  <tr key={log.id} className={selectedLog?.id === log.id ? 'is-selected' : ''}>
+                    <td>{new Date(log.created_at).toLocaleString()}</td>
+                    <td>{log.event_type || log.event}</td>
+                    <td>{log.user || log.actor?.email || '—'}</td>
+                    <td>
+                      {log.entity ||
+                        (log.entity_type
+                          ? `${log.entity_type}${log.entity_id ? `:${log.entity_id}` : ''}`
+                          : '—')}
+                    </td>
+                    <td>
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={() => setSelectedLog(log)}
+                      >
+                        {JSON.stringify(log.payload || {}).slice(0, 60)}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Queue</th>
+                  <th>Payload</th>
+                </tr>
+              </thead>
+              <tbody>
+                {systemLoading && (
+                  <tr>
+                    <td colSpan={3} className="muted">
+                      Loading...
+                    </td>
+                  </tr>
+                )}
+                {!systemLoading && systemLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="muted">
+                      No system logs found.
+                    </td>
+                  </tr>
+                )}
+                {systemLogs.map((log) => (
+                  <tr
+                    key={log.id}
+                    className={selectedSystemLog?.id === log.id ? 'is-selected' : ''}
+                  >
+                    <td>{new Date(log.created_at).toLocaleString()}</td>
+                    <td>{log.queue}</td>
+                    <td>
+                      <button
+                        className="button button-ghost"
+                        type="button"
+                        onClick={() => setSelectedSystemLog(log)}
+                      >
+                        {JSON.stringify(log.payload || {}).slice(0, 80)}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === 'audit' ? (
+          <div className="pagination">
+            <div>{t('settings_audit_page', { page: filters.page, total: totalPages })}</div>
+            <div className="actions-row">
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => setFilters({ ...filters, page: Math.max(1, filters.page - 1) })}
+                disabled={filters.page === 1}
+              >
+                {t('common_prev')}
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() =>
+                  setFilters({ ...filters, page: Math.min(totalPages, filters.page + 1) })
+                }
+                disabled={filters.page >= totalPages}
+              >
+                {t('common_next')}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="pagination">
+            <div>
+              Page {systemFilters.page} of {systemTotalPages}
+            </div>
+            <div className="actions-row">
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() =>
+                  setSystemFilters({
+                    ...systemFilters,
+                    page: Math.max(1, systemFilters.page - 1)
+                  })
+                }
+                disabled={systemFilters.page === 1}
+              >
+                {t('common_prev')}
+              </button>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() =>
+                  setSystemFilters({
+                    ...systemFilters,
+                    page: Math.min(systemTotalPages, systemFilters.page + 1)
+                  })
+                }
+                disabled={systemFilters.page >= systemTotalPages}
+              >
+                {t('common_next')}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {selectedLog && (
+      {activeTab === 'audit' && selectedLog && (
         <div className="card">
           <div className="card__header">
             <div>
@@ -1788,6 +2075,19 @@ function AuditSection({
           </div>
           <p className="muted">{t('settings_audit_payload_source', { id: selectedLog.id })}</p>
           <pre className="code-block">{JSON.stringify(selectedLog.payload, null, 2)}</pre>
+        </div>
+      )}
+
+      {activeTab === 'system' && selectedSystemLog && (
+        <div className="card">
+          <div className="card__header">
+            <div>
+              <p className="muted">System log payload</p>
+              <h2 className="card__title">{selectedSystemLog.queue}</h2>
+            </div>
+            <div className="pill">{selectedSystemLog.id}</div>
+          </div>
+          <pre className="code-block">{JSON.stringify(selectedSystemLog.payload, null, 2)}</pre>
         </div>
       )}
     </div>

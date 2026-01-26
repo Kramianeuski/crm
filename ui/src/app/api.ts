@@ -86,6 +86,13 @@ export type AuditLog = {
   created_at: string;
 };
 
+export type SystemLog = {
+  id: string;
+  queue: string;
+  payload?: Record<string, unknown> | null;
+  created_at: string;
+};
+
 export type Role = {
   id: string;
   code: string;
@@ -289,12 +296,33 @@ export async function fetchUser(id: string): Promise<UserDetail> {
   return user;
 }
 
+export async function createUser(payload: {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  company_name?: string;
+  lang?: string;
+  roles?: string[];
+  is_active?: boolean;
+  password?: string;
+}): Promise<UserDetail> {
+  const { user } = await apiFetch<{ user: UserDetail }>('/core/v1/users', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  });
+  return user;
+}
+
 export async function updateUser(id: string, payload: Partial<UserDetail>): Promise<UserDetail> {
   const { user } = await apiFetch<{ user: UserDetail }>(`/core/v1/users/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload)
   });
   return user;
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await apiFetch(`/core/v1/users/${id}`, { method: 'DELETE' });
 }
 
 export async function fetchDepartments(): Promise<Department[]> {
@@ -352,6 +380,34 @@ export async function fetchAuditLogs(params: {
   }>(`/core/v1/audit?${query.toString()}`);
 
   const logs = data.logs || data.audit || data.items || [];
+  const total = data.total ?? data.pagination?.total;
+  return { logs, total };
+}
+
+export async function fetchSystemLogs(params: {
+  from?: string;
+  to?: string;
+  queue?: string;
+  q?: string;
+  limit?: number;
+  page?: number;
+}): Promise<{ logs: SystemLog[]; total?: number }> {
+  const query = new URLSearchParams();
+  if (params.from) query.set('from', params.from);
+  if (params.to) query.set('to', params.to);
+  if (params.queue) query.set('queue', params.queue);
+  if (params.q) query.set('q', params.q);
+  if (params.limit) query.set('limit', String(params.limit));
+  if (params.page) query.set('page', String(params.page));
+
+  const data = await apiFetch<{
+    logs?: SystemLog[];
+    items?: SystemLog[];
+    total?: number;
+    pagination?: { total?: number };
+  }>(`/core/v1/logs/system?${query.toString()}`);
+
+  const logs = data.logs || data.items || [];
   const total = data.total ?? data.pagination?.total;
   return { logs, total };
 }
