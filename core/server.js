@@ -35,6 +35,8 @@ const { default: i18nRoutes } = await import('./modules/i18n/routes.js');
 const { default: rbacRoutes } = await import('./modules/rbac/routes.js');
 const { default: authzRoutes } = await import('./modules/authz/routes.js');
 const { default: partnersRoutes } = await import('./modules/partners/routes.js');
+const { default: logsRoutes } = await import('./modules/logs/routes.js');
+const { default: usersRoutes } = await import('./modules/users/routes.js');
 
 const app = buildApp();
 const coreBasePath = '/api/core/v1';
@@ -65,6 +67,8 @@ const start = async () => {
     app.register(rbacRoutes, { prefix: coreBasePath });
     app.register(authzRoutes, { prefix: coreBasePath });
     app.register(settingsRoutes, { prefix: coreBasePath });
+    app.register(logsRoutes, { prefix: coreBasePath });
+    app.register(usersRoutes, { prefix: coreBasePath });
     app.register(partnersRoutes, { prefix: partnersBasePath });
 
     const port = Number(process.env.PORT);
