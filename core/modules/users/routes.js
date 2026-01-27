@@ -31,6 +31,7 @@ async function getSecuritySettings(pg) {
 export default async function userRoutes(fastify) {
   fastify.get('/users', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
+      fastify.log.info({ userId: request.user?.id }, 'GET /users called');
       const allowed = await fastify.canAccess(request.user, 'users', 'view');
       if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 

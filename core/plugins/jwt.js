@@ -48,12 +48,22 @@ export default fp(async function jwtPlugin(app) {
         audience: JWT_AUDIENCE
       });
 
+      const userId =
+        payload.sub ?? payload.user_id ?? payload.userId ?? payload.id ?? null;
+
+      if (!userId) {
+        const err = new Error('Unauthorized');
+        err.statusCode = 401;
+        err.code = 'unauthorized';
+        throw err;
+      }
+
       request.user = {
-        id: payload.sub,
+        id: userId,
         email: payload.email,
         lang: payload.lang,
-        roles: payload.roles || [],
-        groups: payload.groups || []
+        roles: Array.isArray(payload.roles) ? payload.roles : [],
+        groups: Array.isArray(payload.groups) ? payload.groups : []
       };
     } catch (err) {
       app.log.warn({ err }, 'JWT verification failed');
