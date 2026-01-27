@@ -100,7 +100,7 @@ export default async function userRoutes(fastify) {
 
       await fastify.pg.query('COMMIT');
 
-      await fastify.audit.logEvent(
+      await fastify.audit?.logEvent?.(
         'user_create',
         { email },
         { actorUserId: request.user.id, entityType: 'user', entityId: id }
@@ -149,7 +149,7 @@ export default async function userRoutes(fastify) {
       }
       await fastify.pg.query('COMMIT');
 
-      await fastify.audit.logEvent(
+      await fastify.audit?.logEvent?.(
         'user_update',
         { fields: Object.keys(payload) },
         { actorUserId: request.user.id, entityType: 'user', entityId: request.params.id }
@@ -176,7 +176,7 @@ export default async function userRoutes(fastify) {
       const removed = await deleteUser(fastify.pg, request.params.id);
       if (!removed) return reply.code(404).send({ error: 'user_not_found' });
 
-      await fastify.audit.logEvent(
+      await fastify.audit?.logEvent?.(
         'user_delete',
         {},
         { actorUserId: request.user.id, entityType: 'user', entityId: request.params.id }
