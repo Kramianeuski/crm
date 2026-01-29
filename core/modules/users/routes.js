@@ -10,13 +10,9 @@ import {
   updateUser
 } from './repository.js';
 
-async function canManageUsers(fastify, request) {
-  return fastify.canAccess(request.user, 'users', 'manage');
-}
-
-async function canAssignRoles(fastify, request) {
-  return fastify.canAccess(request.user, 'users.roles', 'assign');
-}
+const requireAccess = (resource, permission) => async (request, reply) => {
+  if (!await request.server.canAccess(request.user, resource, permission)) return reply.code(403).send({ error: 'forbidden' });
+};
 
 async function getSecuritySettings(pg) {
   const { rows } = await pg.query(
@@ -29,12 +25,13 @@ async function getSecuritySettings(pg) {
 }
 
 export default async function userRoutes(fastify) {
-  fastify.get('/users', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  const preHandler = [fastify.verifyJWT];
+
+  fastify.get('/users', { preHandler: [...preHandler, requireAccess('users', 'view')] }, async (request, reply) => {
     try {
       fastify.log.info({ userId: request.user?.id }, 'GET /users called');
-      const allowed = await fastify.canAccess(request.user, 'users', 'view');
-      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
 
+      // Note: access check is now in preHandler
       const users = await fetchUsers(fastify.pg);
       return reply.send({ users });
     } catch (err) {
@@ -43,11 +40,9 @@ export default async function userRoutes(fastify) {
     }
   });
 
-  fastify.get('/users/:id', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.get('/users/:id', { preHandler: [...preHandler, requireAccess('users', 'view')] }, async (request, reply) => {
     try {
-      const allowed = await fastify.canAccess(request.user, 'users', 'view');
-      if (!allowed) return reply.code(403).send({ error: 'forbidden' });
-
+      // Note: access check is now in preHandler
       const user = await fetchUser(fastify.pg, request.params.id);
       if (!user) return reply.code(404).send({ error: 'user_not_found' });
 
@@ -58,11 +53,9 @@ export default async function userRoutes(fastify) {
     }
   });
 
-  fastify.post('/users', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.post('/users', { preHandler: [...preHandler, requireAccess('users', 'manage')] }, async (request, reply) => {
     try {
-      if (!(await canManageUsers(fastify, request))) {
-        return reply.code(403).send({ error: 'forbidden' });
-      }
+      // Note: access check is now in preHandler
 
       const payload = request.body || {};
       if (!payload.email) {
@@ -101,7 +94,7 @@ export default async function userRoutes(fastify) {
 
       await fastify.pg.query('COMMIT');
 
-      await fastify.audit?.logEvent?.(
+      fastify.audit?.logEvent?.(
         'user_create',
         { email },
         { actorUserId: request.user.id, entityType: 'user', entityId: id }
@@ -123,13 +116,17 @@ export default async function userRoutes(fastify) {
     try {
       const payload = request.body || {};
       const rolesProvided = Array.isArray(payload.roles);
-      const canManage = await canManageUsers(fastify, request);
-      const canAssign = await canAssignRoles(fastify, request);
+      const canManage = await fastify.canAccess(request.user, 'users', 'manage');
 
-      if (!canManage && !(rolesProvided && canAssign && Object.keys(payload).length === 1)) {
-        return reply.code(403).send({ error: 'forbidden' });
+      // If roles are provided, user must have either 'users.manage' or 'users.roles.assign'
+      if (rolesProvided && !canManage) {
+        const canAssign = await fastify.canAccess(request.user, 'users.roles', 'assign');
+        if (!canAssign) return reply.code(403).send({ error: 'forbidden' });
       }
-      if (rolesProvided && !(canAssign || canManage)) {
+
+      // If other fields are provided, user must have 'users.manage'
+      const otherFieldsProvided = Object.keys(payload).some(k => k !== 'roles');
+      if (otherFieldsProvided && !canManage) {
         return reply.code(403).send({ error: 'forbidden' });
       }
 
@@ -137,20 +134,22 @@ export default async function userRoutes(fastify) {
       if (!user) return reply.code(404).send({ error: 'user_not_found' });
 
       await fastify.pg.query('BEGIN');
-      await updateUser(fastify.pg, request.params.id, {
-        first_name: payload.first_name,
-        last_name: payload.last_name,
-        company_name: payload.company_name,
-        lang: payload.lang,
-        is_active: payload.is_active
-      });
+      if (otherFieldsProvided) {
+        await updateUser(fastify.pg, request.params.id, {
+          first_name: payload.first_name,
+          last_name: payload.last_name,
+          company_name: payload.company_name,
+          lang: payload.lang,
+          is_active: payload.is_active
+        });
+      }
 
       if (rolesProvided) {
         await replaceUserRoles(fastify.pg, request.params.id, payload.roles);
       }
       await fastify.pg.query('COMMIT');
 
-      await fastify.audit?.logEvent?.(
+      fastify.audit?.logEvent?.(
         'user_update',
         { fields: Object.keys(payload) },
         { actorUserId: request.user.id, entityType: 'user', entityId: request.params.id }
@@ -165,19 +164,17 @@ export default async function userRoutes(fastify) {
     }
   };
 
-  fastify.patch('/users/:id', { preHandler: fastify.verifyJWT }, updateHandler);
-  fastify.put('/users/:id', { preHandler: fastify.verifyJWT }, updateHandler);
+  fastify.patch('/users/:id', { preHandler }, updateHandler);
+  fastify.put('/users/:id', { preHandler }, updateHandler);
 
-  fastify.delete('/users/:id', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+  fastify.delete('/users/:id', { preHandler: [...preHandler, requireAccess('users', 'manage')] }, async (request, reply) => {
     try {
-      if (!(await canManageUsers(fastify, request))) {
-        return reply.code(403).send({ error: 'forbidden' });
-      }
+      // Note: access check is now in preHandler
 
       const removed = await deleteUser(fastify.pg, request.params.id);
       if (!removed) return reply.code(404).send({ error: 'user_not_found' });
 
-      await fastify.audit?.logEvent?.(
+      fastify.audit?.logEvent?.(
         'user_delete',
         {},
         { actorUserId: request.user.id, entityType: 'user', entityId: request.params.id }
