@@ -106,6 +106,40 @@ export type Permission = {
   description: string | null;
 };
 
+export type Category = {
+  id: string;
+  parent_id?: string | null;
+  code: string;
+  slug: string;
+  name?: string | null;
+  description?: string | null;
+  is_active?: boolean;
+  sort_order?: number;
+  children?: Category[];
+};
+
+export type Attribute = {
+  id: string;
+  code: string;
+  value_type: string;
+  unit_id?: string | null;
+  name?: string | null;
+  is_system?: boolean;
+  is_filterable?: boolean;
+  is_required?: boolean;
+  sort_order?: number;
+};
+
+export type Warehouse = {
+  id: string;
+  code: string;
+  name: string;
+  city: string;
+  is_company_stock: boolean;
+  is_active: boolean;
+  created_at: string;
+};
+
 export type NavigationItem = {
   code: string;
   title: string;
@@ -287,6 +321,31 @@ export async function updateSettings(payload: Partial<CoreSettings>): Promise<vo
     method: 'PUT',
     body: JSON.stringify(payload)
   });
+}
+
+export async function fetchCategories(lang?: string): Promise<Category[]> {
+  const query = new URLSearchParams();
+  if (lang) query.set('lang', lang);
+  const suffix = query.toString();
+  const data = await apiFetch<{ categories: Category[] }>(
+    `/v1/categories${suffix ? `?${suffix}` : ''}`
+  );
+  return data.categories;
+}
+
+export async function fetchAttributes(lang?: string): Promise<Attribute[]> {
+  const query = new URLSearchParams();
+  if (lang) query.set('lang', lang);
+  const suffix = query.toString();
+  const data = await apiFetch<{ attributes: Attribute[] }>(
+    `/v1/attributes${suffix ? `?${suffix}` : ''}`
+  );
+  return data.attributes;
+}
+
+export async function fetchWarehouses(): Promise<Warehouse[]> {
+  const data = await apiFetch<{ warehouses: Warehouse[] }>('/v1/warehouses');
+  return data.warehouses;
 }
 
 export async function fetchRoles(): Promise<Role[]> {
