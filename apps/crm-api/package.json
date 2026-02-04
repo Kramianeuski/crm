@@ -1,0 +1,11 @@
+{
+  "name": "@crm/api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "dotenv": "^16.4.5"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}
