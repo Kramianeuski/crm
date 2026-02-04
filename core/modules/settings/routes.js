@@ -68,6 +68,49 @@ export default async function settingsRoutes(fastify) {
     }
   });
 
+  fastify.get('/navigation', { preHandler: fastify.verifyJWT }, async (request, reply) => {
+    try {
+      const modules = await fetchModules(fastify.pg);
+      const navigation = [];
+
+      for (const module of modules) {
+        const pages = await fetchPages(fastify.pg, module.id);
+        const children = [];
+
+        for (const page of pages) {
+          const resource = getPermissionResource(page.permission_code);
+          const allowed = await fastify.canAccess(request.user, resource, 'view');
+          if (!allowed) continue;
+
+          children.push({
+            code: page.code,
+            title: page.title_key,
+            title_key: page.title_key,
+            route: `/${module.code}/${page.code}`
+          });
+        }
+
+        if (children.length === 0) {
+          continue;
+        }
+
+        navigation.push({
+          code: module.code,
+          title: module.title_key,
+          title_key: module.title_key,
+          icon: module.icon,
+          route: `/${module.code}`,
+          children
+        });
+      }
+
+      return reply.send(navigation);
+    } catch (err) {
+      request.log.error(err);
+      return reply.code(500).send({ error: 'internal_error' });
+    }
+  });
+
   fastify.get('/settings/schema/:module/:page', { preHandler: fastify.verifyJWT }, async (request, reply) => {
     try {
       const { module, page } = request.params;

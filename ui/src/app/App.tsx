@@ -5,6 +5,7 @@ import Shell from '../layout/Shell';
 import Login from '../pages/Login';
 import Settings from '../pages/Settings';
 import UserProfile from '../pages/UserProfile';
+import ModulePlaceholder from '../pages/ModulePlaceholder';
 import { User, fetchCurrentUser, tokenStore } from './api';
 import { I18nProvider, useI18n } from './i18n';
 
@@ -106,6 +107,8 @@ function AppContent({ booting, onAuthenticated, onLogout, contextValue, user }: 
             <Route path="/settings" element={<Settings />} />
             <Route path="/users/:id" element={<UserProfile />} />
             <Route path="/users/:id/edit" element={<UserProfile />} />
+            <Route path="/:module" element={<ModulePlaceholder />} />
+            <Route path="/:module/:page" element={<ModulePlaceholder />} />
             <Route path="/" element={<Navigate to="/settings" replace />} />
           </Route>
         </Route>

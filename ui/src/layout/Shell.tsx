@@ -10,18 +10,17 @@ type Props = {
 };
 
 export default function Shell({ user, onLogout }: Props) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   return (
-    <div className={`app-shell ${sidebarOpen ? 'is-sidebar-open' : 'is-sidebar-collapsed'}`}>
+    <div className={`app-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : 'is-sidebar-open'}`}>
       <Header
         user={user}
         onLogout={onLogout}
-        onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
-        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+        sidebarOpen={!sidebarCollapsed}
       />
       <div className="app-shell__body">
-        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        {sidebarOpen && <button className="sidebar-backdrop" type="button" onClick={() => setSidebarOpen(false)} />}
+        <Sidebar collapsed={sidebarCollapsed} />
         <main className="app-shell__content">
           <Outlet />
         </main>
