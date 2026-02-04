@@ -38,6 +38,33 @@ PORT=3000
 NODE_ENV=development
 ```
 
+## Runbook: источники конфигурации для DATABASE_URL и API
+
+### Backend (crm-core / crm-api)
+
+Порядок загрузки env-файлов:
+
+1. `/etc/crm/core.env` (обязательный системный источник).
+2. `CORE_ENV_PATH` (если задан, используется как путь к .env).
+3. Локальный `.env` в каталоге запуска.
+
+Ключевые переменные:
+
+- `DATABASE_URL` (предпочтительно) или набор `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD`.
+- `PORT`, `NODE_ENV`, `JWT_SECRET`.
+
+Проверить фактическое подключение можно по логам запуска (`CRM API started`) и через `dbmate status`,
+используя тот же `DATABASE_URL`, что и сервис.
+
+### UI
+
+Frontend использует относительный префикс `/api` (см. `ui/src/app/api.ts`), поэтому в production
+`API_BASE_URL` фактически задаётся на уровне reverse proxy (nginx/traefik) или CDN, который
+проксирует `/api/*` на backend (`/api/core/v1`, `/api/v1`, `/api/partners/v1`).
+
+Если UI и backend развёрнуты на разных доменах, настройте прокси/Ingress так, чтобы `/api`
+указывал на нужный backend.
+
 ## Миграции БД
 
 Миграции запускаются вручную:
