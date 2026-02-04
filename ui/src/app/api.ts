@@ -106,6 +106,15 @@ export type Permission = {
   description: string | null;
 };
 
+export type NavigationItem = {
+  code: string;
+  title: string;
+  title_key?: string | null;
+  icon?: string | null;
+  route: string;
+  children?: NavigationItem[];
+};
+
 type MeResponse = {
   user: {
     id: number | string;
@@ -235,6 +244,10 @@ export async function fetchCurrentUser(): Promise<User> {
 
 export async function fetchTranslationsBundle(): Promise<TranslationsResponse> {
   return apiFetch<TranslationsResponse>('/core/v1/i18n/translations');
+}
+
+export async function fetchNavigation(): Promise<NavigationItem[]> {
+  return apiFetch<NavigationItem[]>('/core/v1/navigation');
 }
 
 export async function createLanguage(payload: {
