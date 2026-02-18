@@ -171,6 +171,11 @@ type RequestOptions = RequestInit & {
   skipAuth?: boolean;
 };
 
+type ApiError = Error & {
+  code?: string | null;
+  status?: number;
+};
+
 /* ===============================
    Token storage
    =============================== */
@@ -229,13 +234,27 @@ async function apiFetch<T>(
     : await response.text();
 
   if (!response.ok) {
+    const fallbackMessage =
+      response.status === 403
+        ? 'Нет доступа'
+        : response.status === 404
+          ? 'Раздел не найден'
+          : 'Request failed';
     const message =
       typeof payload === 'string'
-        ? payload || 'Request failed'
-        : payload?.error || payload?.message || 'Request failed';
-    const error = new Error(message);
-    // @ts-expect-error - propagate backend error key for i18n
+        ? payload || fallbackMessage
+        : payload?.error || payload?.message || fallbackMessage;
+    const error: ApiError = new Error(message);
     error.code = typeof payload === 'object' && payload ? payload.error || null : null;
+    error.status = response.status;
+
+    if (response.status === 401 && !options.skipAuth) {
+      tokenStore.clear();
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.replace('/login');
+      }
+    }
+
     throw error;
   }
 

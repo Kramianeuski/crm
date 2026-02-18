@@ -39,6 +39,7 @@ function resolveLabel(
       return translated;
     }
   }
+
   return item.title;
 }
 

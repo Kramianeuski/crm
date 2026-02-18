@@ -10,7 +10,7 @@ export async function fetchModules(pg) {
 
 export async function fetchPages(pg, moduleId) {
   const { rows } = await pg.query(
-    `SELECT code, title_key, permission_code, sort_order
+    `SELECT code, title_key, permission_code, sort_order, ui_route
      FROM core.settings_pages
      WHERE module_id = $1
      ORDER BY sort_order ASC, code ASC`,
