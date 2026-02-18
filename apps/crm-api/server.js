@@ -57,7 +57,13 @@ validateEnv();
 const { default: buildApp } = await import('../../core/app.js');
 const { default: healthRoutes } = await import('../../core/modules/health/routes.js');
 const { default: authRoutes } = await import('../../core/modules/auth/routes.js');
+const { default: accessRoutes } = await import('../../core/modules/access/routes.js');
+const { default: settingsRoutes } = await import('../../core/modules/settings/routes.js');
 const { default: i18nRoutes } = await import('../../core/modules/i18n/routes.js');
+const { default: rbacRoutes } = await import('../../core/modules/rbac/routes.js');
+const { default: authzRoutes } = await import('../../core/modules/authz/routes.js');
+const { default: logsRoutes } = await import('../../core/modules/logs/routes.js');
+const { default: usersRoutes } = await import('../../core/modules/users/routes.js');
 const { default: productsRoutes } = await import('../../modules/products/http/routes.js');
 const { default: warehouseRoutes } = await import('../../modules/warehouse/http/routes.js');
 
@@ -86,6 +92,12 @@ const start = async () => {
     app.register(healthRoutes, { logLevel: 'silent' });
     app.register(i18nRoutes, { prefix: coreBasePath });
     app.register(authRoutes, { prefix: coreBasePath });
+    app.register(accessRoutes, { prefix: coreBasePath });
+    app.register(rbacRoutes, { prefix: coreBasePath });
+    app.register(authzRoutes, { prefix: coreBasePath });
+    app.register(settingsRoutes, { prefix: coreBasePath });
+    app.register(logsRoutes, { prefix: coreBasePath });
+    app.register(usersRoutes, { prefix: coreBasePath });
 
     app.register(productsRoutes, { prefix: apiBasePath });
     app.register(warehouseRoutes, { prefix: apiBasePath });
