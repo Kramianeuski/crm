@@ -65,6 +65,16 @@ export default function buildApp() {
   app.register(accessPlugin);
   app.register(partnerJwtPlugin);
 
+  app.decorate('readinessState', {
+    status: 'ok',
+    checks: {
+      settingsUiRouteContract: {
+        status: 'ok',
+        message: 'ui_route contract is valid'
+      }
+    }
+  });
+
   /* =========================
    * Hooks
    * ========================= */

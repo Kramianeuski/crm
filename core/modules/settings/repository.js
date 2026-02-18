@@ -9,32 +9,6 @@ export async function fetchModules(pg) {
 }
 
 export async function fetchPages(pg, moduleId) {
-<<<<<<< codex/fix-crm-module-loading-issues-59znpv
-  try {
-    const { rows } = await pg.query(
-      `SELECT code, title_key, permission_code, sort_order, ui_route
-       FROM core.settings_pages
-       WHERE module_id = $1
-       ORDER BY sort_order ASC, code ASC`,
-      [moduleId]
-    );
-    return rows;
-  } catch (err) {
-    if (err?.code !== '42703') {
-      throw err;
-    }
-
-    const { rows } = await pg.query(
-      `SELECT code, title_key, permission_code, sort_order
-       FROM core.settings_pages
-       WHERE module_id = $1
-       ORDER BY sort_order ASC, code ASC`,
-      [moduleId]
-    );
-
-    return rows.map((row) => ({ ...row, ui_route: null }));
-  }
-=======
   const { rows } = await pg.query(
     `SELECT code, title_key, permission_code, sort_order, ui_route
      FROM core.settings_pages
@@ -43,7 +17,32 @@ export async function fetchPages(pg, moduleId) {
     [moduleId]
   );
   return rows;
->>>>>>> main
+}
+
+export async function hasUiRouteColumn(pg) {
+  const { rows } = await pg.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM information_schema.columns
+       WHERE table_schema = 'core'
+         AND table_name = 'settings_pages'
+         AND column_name = 'ui_route'
+     ) AS exists`
+  );
+
+  return rows[0]?.exists === true;
+}
+
+export async function hasSettingsPagesWithMissingRoute(pg) {
+  const { rows } = await pg.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM core.settings_pages
+       WHERE ui_route IS NULL OR ui_route = ''
+     ) AS exists`
+  );
+
+  return rows[0]?.exists === true;
 }
 
 export async function findModule(pg, code) {

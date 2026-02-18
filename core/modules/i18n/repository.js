@@ -236,20 +236,9 @@ export async function upsertAliases(pg, key, aliases) {
 
 export async function loadTranslations(pg) {
   const { rows } = await pg.query(
-    `SELECT src.key, src.language_code, src.value
-     FROM (
-       SELECT t.key, t.lang AS language_code, t.value
-       FROM core.translations t
-
-       UNION ALL
-
-       SELECT it.key, it.language_code, it.value
-       FROM core.i18n_translations it
-       LEFT JOIN core.translations t
-         ON t.key = it.key AND t.lang = it.language_code
-       WHERE t.key IS NULL
-     ) AS src
-     JOIN core.languages l ON l.code = src.language_code AND l.is_active = true`
+    `SELECT t.key, t.lang AS language_code, t.value
+     FROM core.translations t
+     JOIN core.languages l ON l.code = t.lang AND l.is_active = true`
   );
 
   const map = {};

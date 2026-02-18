@@ -8,20 +8,21 @@ import {
 } from './repository.js';
 
 export default async function settingsRoutes(fastify) {
-  const uiRouteByModulePage = {
-    'core:system': '/settings#system-general',
-    'core:users': '/settings#users-list',
-    'core:roles': '/settings#roles',
-    'core:languages': '/settings#languages',
-    'core:audit': '/settings#audit',
-    'products:catalog': '/products/catalog',
-    'products:attributes': '/products/attributes',
-    'warehouse:warehouses': '/warehouse/warehouses'
-  };
+  const allowLegacyRouteFallback = process.env.NAVIGATION_ROUTE_FALLBACK === 'true';
 
-  const resolveUiRoute = (moduleCode, pageCode, uiRoute) => {
-    if (uiRoute) return uiRoute;
-    return uiRouteByModulePage[`${moduleCode}:${pageCode}`] || `/${moduleCode}/${pageCode}`;
+  const resolveLegacyUiRoute = (moduleCode, pageCode) => {
+    const uiRouteByModulePage = {
+      'core:system': '/settings#system-general',
+      'core:users': '/settings#users-list',
+      'core:roles': '/settings#roles',
+      'core:languages': '/settings#languages',
+      'core:audit': '/settings#audit',
+      'products:catalog': '/products/catalog',
+      'products:attributes': '/products/attributes',
+      'warehouse:warehouses': '/warehouse/warehouses'
+    };
+
+    return uiRouteByModulePage[`${moduleCode}:${pageCode}`] || null;
   };
 
   const getPermissionResource = permissionCode => {
@@ -98,15 +99,22 @@ export default async function settingsRoutes(fastify) {
           const allowed = await fastify.canAccess(request.user, resource, 'view');
           if (!allowed) continue;
 
+          const route =
+            page.ui_route ||
+            (allowLegacyRouteFallback ? resolveLegacyUiRoute(module.code, page.code) : null);
+          if (!route) {
+            request.log.warn(
+              { module: module.code, page: page.code },
+              'settings page skipped in navigation due to missing ui_route'
+            );
+            continue;
+          }
+
           children.push({
             code: page.code,
             title: page.title_key,
             title_key: page.title_key,
-<<<<<<< codex/fix-crm-module-loading-issues-59znpv
-            route: resolveUiRoute(module.code, page.code, page.ui_route)
-=======
-            route: page.ui_route || `/${module.code}/${page.code}`
->>>>>>> main
+            route
           });
         }
 
