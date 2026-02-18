@@ -12,8 +12,16 @@ import {
 async function optionalVerify(fastify, request) {
   const authHeader = request.headers.authorization;
   if (!authHeader) return false;
-  await fastify.verifyJWT(request);
-  return Boolean(request.user);
+
+  try {
+    await fastify.verifyJWT(request);
+    return Boolean(request.user);
+  } catch (err) {
+    if (err?.statusCode === 401) {
+      return false;
+    }
+    throw err;
+  }
 }
 
 export default async function i18nRoutes(fastify) {
