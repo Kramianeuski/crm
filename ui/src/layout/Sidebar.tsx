@@ -29,6 +29,14 @@ function resolveLabel(
   t: (key: string) => string,
   item: Pick<NavigationItem, 'title' | 'title_key'>
 ): string {
+  const fallbackByKey: Record<string, string> = {
+    'settings.products': 'Товары',
+    'settings.products.catalog': 'Каталог',
+    'settings.products.attributes': 'Атрибуты',
+    'settings.warehouse': 'Склад',
+    'settings.warehouse.list': 'Склады'
+  };
+
   if (item.title_key) {
     const translated = t(item.title_key);
     if (
@@ -38,9 +46,28 @@ function resolveLabel(
     ) {
       return translated;
     }
+
+    if (fallbackByKey[item.title_key]) {
+      return fallbackByKey[item.title_key];
+    }
+  }
+
+  if (fallbackByKey[item.title]) {
+    return fallbackByKey[item.title];
   }
 
   return item.title;
+}
+
+function normalizeRoute(route: string): string {
+  const aliases: Record<string, string> = {
+    '/settings/system': '/settings',
+    '/settings.products/catalog': '/products/catalog',
+    '/settings.products/attributes': '/products/attributes',
+    '/settings.warehouse/warehouses': '/warehouse/warehouses'
+  };
+
+  return aliases[route] || route;
 }
 
 export default function Sidebar({ collapsed }: Props) {
@@ -164,13 +191,14 @@ export default function Sidebar({ collapsed }: Props) {
                 <div className="nav-group__items">
                   {group.children?.map((item) => {
                     const itemLabel = resolveLabel(t, item);
+                    const route = normalizeRoute(item.route);
                     return (
                       <NavLink
                         key={item.code}
-                        to={item.route}
+                        to={route}
                         className={() =>
                           `nav-link nav-link--child ${
-                            currentPath === item.route ? 'is-active' : ''
+                            currentPath === route ? 'is-active' : ''
                           }`
                         }
                       >

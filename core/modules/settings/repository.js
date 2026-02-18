@@ -9,6 +9,7 @@ export async function fetchModules(pg) {
 }
 
 export async function fetchPages(pg, moduleId) {
+<<<<<<< codex/fix-crm-module-loading-issues-59znpv
   try {
     const { rows } = await pg.query(
       `SELECT code, title_key, permission_code, sort_order, ui_route
@@ -33,6 +34,16 @@ export async function fetchPages(pg, moduleId) {
 
     return rows.map((row) => ({ ...row, ui_route: null }));
   }
+=======
+  const { rows } = await pg.query(
+    `SELECT code, title_key, permission_code, sort_order, ui_route
+     FROM core.settings_pages
+     WHERE module_id = $1
+     ORDER BY sort_order ASC, code ASC`,
+    [moduleId]
+  );
+  return rows;
+>>>>>>> main
 }
 
 export async function findModule(pg, code) {

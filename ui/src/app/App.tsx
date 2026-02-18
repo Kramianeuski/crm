@@ -108,11 +108,15 @@ function AppContent({ booting, onAuthenticated, onLogout, contextValue, user }: 
         <Route element={<AuthGuard user={user} onLogout={onLogout} />}>
           <Route element={<Shell user={user} onLogout={onLogout} />}>
             <Route path="/settings" element={<Settings />} />
+            <Route path="/settings/system" element={<Navigate to="/settings" replace />} />
             <Route path="/users/:id" element={<UserProfile />} />
             <Route path="/users/:id/edit" element={<UserProfile />} />
             <Route path="/products/catalog" element={<ProductsCatalog />} />
             <Route path="/products/attributes" element={<ProductAttributes />} />
+            <Route path="/settings.products/catalog" element={<ProductsCatalog />} />
+            <Route path="/settings.products/attributes" element={<ProductAttributes />} />
             <Route path="/warehouse/warehouses" element={<Warehouses />} />
+            <Route path="/settings.warehouse/warehouses" element={<Warehouses />} />
             <Route path="/warehouse" element={<Navigate to="/warehouse/warehouses" replace />} />
             <Route path="/:module" element={<ModulePlaceholder />} />
             <Route path="/:module/:page" element={<ModulePlaceholder />} />

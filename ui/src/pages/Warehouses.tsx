@@ -32,7 +32,8 @@ export default function Warehouses() {
     };
   }, []);
 
-  const title = t('settings.warehouse.list');
+  const translatedTitle = t('settings.warehouse.list');
+  const title = translatedTitle === 'settings.warehouse.list' ? 'Склады' : translatedTitle;
   const subtitle = useMemo(() => {
     if (loading) return t('app_loading');
     if (error) return error;

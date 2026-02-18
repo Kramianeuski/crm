@@ -32,7 +32,8 @@ export default function ProductAttributes() {
     };
   }, [language]);
 
-  const title = t('settings.products.attributes');
+  const translatedTitle = t('settings.products.attributes');
+  const title = translatedTitle === 'settings.products.attributes' ? 'Атрибуты' : translatedTitle;
   const subtitle = useMemo(() => {
     if (loading) return t('app_loading');
     if (error) return error;

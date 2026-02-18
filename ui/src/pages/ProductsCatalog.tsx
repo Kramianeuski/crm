@@ -45,7 +45,8 @@ export default function ProductsCatalog() {
     };
   }, [language]);
 
-  const title = t('settings.products.catalog');
+  const translatedTitle = t('settings.products.catalog');
+  const title = translatedTitle === 'settings.products.catalog' ? 'Каталог' : translatedTitle;
   const hasCategories = categories.length > 0;
   const subtitle = useMemo(() => {
     if (loading) return t('app_loading');

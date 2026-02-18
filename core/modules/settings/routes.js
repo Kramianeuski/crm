@@ -102,7 +102,11 @@ export default async function settingsRoutes(fastify) {
             code: page.code,
             title: page.title_key,
             title_key: page.title_key,
+<<<<<<< codex/fix-crm-module-loading-issues-59znpv
             route: resolveUiRoute(module.code, page.code, page.ui_route)
+=======
+            route: page.ui_route || `/${module.code}/${page.code}`
+>>>>>>> main
           });
         }
 
