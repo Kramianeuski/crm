@@ -13,7 +13,7 @@ const requireAuth = async (request, reply) => {
 export default async function warehouseRoutes(fastify) {
   const preHandler = [fastify.verifyJWT, requireAuth];
 
-  fastify.get('/warehouses', { preHandler }, async (request, reply) => {
+  const listWarehouses = async (request, reply) => {
     try {
       const { rows } = await fastify.pg.query(
         `SELECT id, code, name, city, is_company_stock, is_active, created_at
@@ -25,7 +25,11 @@ export default async function warehouseRoutes(fastify) {
       request.log.error(err);
       return reply.code(500).send({ error: 'internal_error' });
     }
-  });
+  };
+
+  fastify.get('/warehouse', { preHandler }, listWarehouses);
+
+  fastify.get('/warehouses', { preHandler }, listWarehouses);
 
   fastify.put('/users/me/default-warehouse', { preHandler }, async (request, reply) => {
     try {
