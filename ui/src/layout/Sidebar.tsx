@@ -60,14 +60,11 @@ function resolveLabel(
 }
 
 function normalizeRoute(route: string): string {
-  const aliases: Record<string, string> = {
-    '/settings/system': '/settings',
-    '/settings.products/catalog': '/products/catalog',
-    '/settings.products/attributes': '/products/attributes',
-    '/settings.warehouse/warehouses': '/warehouse/warehouses'
-  };
+  if (route === '/settings/system') {
+    return '/settings';
+  }
 
-  return aliases[route] || route;
+  return route;
 }
 
 export default function Sidebar({ collapsed }: Props) {

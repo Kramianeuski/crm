@@ -66,11 +66,57 @@ const { default: logsRoutes } = await import('../../core/modules/logs/routes.js'
 const { default: usersRoutes } = await import('../../core/modules/users/routes.js');
 const { default: productsRoutes } = await import('../../modules/products/http/routes.js');
 const { default: warehouseRoutes } = await import('../../modules/warehouse/http/routes.js');
+const { hasUiRouteColumn, hasSettingsPagesWithMissingRoute } = await import('../../core/modules/settings/repository.js');
 
 const app = buildApp();
 const coreBasePath = '/api/core/v1';
 const apiBasePath = '/api/v1';
 let isShuttingDown = false;
+
+
+async function runStartupChecks() {
+  const checks = {
+    settingsUiRouteContract: {
+      status: 'ok',
+      message: 'ui_route contract is valid'
+    }
+  };
+
+  let status = 'ok';
+
+  try {
+    const hasColumn = await hasUiRouteColumn(app.pg);
+    if (!hasColumn) {
+      checks.settingsUiRouteContract = {
+        status: 'degraded',
+        message: 'Missing core.settings_pages.ui_route column. Apply DB migration 014+.'
+      };
+      status = 'degraded';
+    } else {
+      const hasMissingRoutes = await hasSettingsPagesWithMissingRoute(app.pg);
+      if (hasMissingRoutes) {
+        checks.settingsUiRouteContract = {
+          status: 'degraded',
+          message: 'Some settings pages have empty ui_route values. Apply route backfill migration.'
+        };
+        status = 'degraded';
+      }
+    }
+  } catch (err) {
+    checks.settingsUiRouteContract = {
+      status: 'degraded',
+      message: 'Could not verify ui_route contract during startup.'
+    };
+    status = 'degraded';
+    app.log.error({ err }, 'Startup schema check failed for settings ui_route contract');
+  }
+
+  app.readinessState = { status, checks };
+
+  if (status !== 'ok') {
+    app.log.error({ checks }, 'Startup checks degraded: navigation contract is not ready');
+  }
+}
 
 const shutdown = async (signal) => {
   if (isShuttingDown) return;
@@ -101,6 +147,9 @@ const start = async () => {
 
     app.register(productsRoutes, { prefix: apiBasePath });
     app.register(warehouseRoutes, { prefix: apiBasePath });
+
+    await app.ready();
+    await runStartupChecks();
 
     const port = Number(process.env.PORT);
     await app.listen({ port, host: '0.0.0.0' });

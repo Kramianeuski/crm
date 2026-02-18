@@ -65,7 +65,7 @@ JOIN core.permissions p ON p.code IN (
 WHERE r.code IN ('super_admin', 'admin')
 ON CONFLICT (role_id, permission_id) DO NOTHING;
 
-INSERT INTO core.i18n_translations (key, language_code, value)
+INSERT INTO core.translations (key, lang, value)
 VALUES
   ('settings.products', 'en', 'Products'),
   ('settings.products', 'ru', 'Товары'),
@@ -77,7 +77,7 @@ VALUES
   ('settings.warehouse', 'ru', 'Склад'),
   ('settings.warehouse.list', 'en', 'Warehouses'),
   ('settings.warehouse.list', 'ru', 'Склады')
-ON CONFLICT (key, language_code) DO UPDATE
+ON CONFLICT (key, lang) DO UPDATE
   SET value = EXCLUDED.value;
 
 -- migrate:down
