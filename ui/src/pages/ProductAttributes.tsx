@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Attribute, fetchAttributes } from '../app/api';
 import { useI18n } from '../app/i18n';
 
@@ -69,6 +70,14 @@ export default function ProductAttributes() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && !error && attributes.length === 0 && (
+          <div className="stack">
+            <p className="muted">Атрибуты ещё не созданы.</p>
+            <Link to="/settings#system-general" className="button button-secondary">
+              Открыть настройки
+            </Link>
           </div>
         )}
       </div>

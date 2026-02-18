@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Category, fetchCategories } from '../app/api';
 import { useI18n } from '../app/i18n';
 
@@ -75,6 +76,14 @@ export default function ProductsCatalog() {
           <p className="muted">{subtitle}</p>
         </div>
         {!loading && !error && hasCategories && renderTree(categories)}
+        {!loading && !error && !hasCategories && (
+          <div className="stack">
+            <p className="muted">Категории ещё не созданы.</p>
+            <Link to="/settings#system-general" className="button button-secondary">
+              Открыть настройки
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

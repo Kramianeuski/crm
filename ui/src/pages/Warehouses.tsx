@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Warehouse, fetchWarehouses } from '../app/api';
 import { useI18n } from '../app/i18n';
 
@@ -75,6 +76,14 @@ export default function Warehouses() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {!loading && !error && warehouses.length === 0 && (
+          <div className="stack">
+            <p className="muted">Склады ещё не созданы.</p>
+            <Link to="/settings#system-general" className="button button-secondary">
+              Открыть настройки
+            </Link>
           </div>
         )}
       </div>
