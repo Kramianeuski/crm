@@ -8,6 +8,22 @@ import {
 } from './repository.js';
 
 export default async function settingsRoutes(fastify) {
+  const uiRouteByModulePage = {
+    'core:system': '/settings#system-general',
+    'core:users': '/settings#users-list',
+    'core:roles': '/settings#roles',
+    'core:languages': '/settings#languages',
+    'core:audit': '/settings#audit',
+    'products:catalog': '/products/catalog',
+    'products:attributes': '/products/attributes',
+    'warehouse:warehouses': '/warehouse/warehouses'
+  };
+
+  const resolveUiRoute = (moduleCode, pageCode, uiRoute) => {
+    if (uiRoute) return uiRoute;
+    return uiRouteByModulePage[`${moduleCode}:${pageCode}`] || `/${moduleCode}/${pageCode}`;
+  };
+
   const getPermissionResource = permissionCode => {
     const parts = permissionCode.split('.');
     if (parts.length === 1) return permissionCode;
@@ -86,7 +102,7 @@ export default async function settingsRoutes(fastify) {
             code: page.code,
             title: page.title_key,
             title_key: page.title_key,
-            route: `/${module.code}/${page.code}`
+            route: resolveUiRoute(module.code, page.code, page.ui_route)
           });
         }
 

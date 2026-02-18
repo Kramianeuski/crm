@@ -1,8 +1,36 @@
-import dotenv from 'dotenv';
+import fs from 'fs';
 import process from 'process';
 
-dotenv.config({ path: '/etc/crm/core.env' });
-dotenv.config({ path: process.env.CORE_ENV_PATH || '.env' });
+function loadEnvFile(path) {
+  try {
+    const raw = fs.readFileSync(path, 'utf8');
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      const separator = trimmed.indexOf('=');
+      if (separator === -1) continue;
+
+      const key = trimmed.slice(0, separator).trim();
+      let value = trimmed.slice(separator + 1).trim();
+
+      const hasDoubleQuotes = value.startsWith('"') && value.endsWith('"');
+      const hasSingleQuotes = value.startsWith("'") && value.endsWith("'");
+      if (hasDoubleQuotes || hasSingleQuotes) {
+        value = value.slice(1, -1);
+      }
+
+      if (!(key in process.env)) {
+        process.env[key] = value;
+      }
+    }
+  } catch {
+    // ignore missing env file
+  }
+}
+
+loadEnvFile('/etc/crm/core.env');
+loadEnvFile(process.env.CORE_ENV_PATH || '.env');
 
 const REQUIRED_ENV = [
   'PORT',
@@ -29,7 +57,13 @@ validateEnv();
 const { default: buildApp } = await import('../../core/app.js');
 const { default: healthRoutes } = await import('../../core/modules/health/routes.js');
 const { default: authRoutes } = await import('../../core/modules/auth/routes.js');
+const { default: accessRoutes } = await import('../../core/modules/access/routes.js');
+const { default: settingsRoutes } = await import('../../core/modules/settings/routes.js');
 const { default: i18nRoutes } = await import('../../core/modules/i18n/routes.js');
+const { default: rbacRoutes } = await import('../../core/modules/rbac/routes.js');
+const { default: authzRoutes } = await import('../../core/modules/authz/routes.js');
+const { default: logsRoutes } = await import('../../core/modules/logs/routes.js');
+const { default: usersRoutes } = await import('../../core/modules/users/routes.js');
 const { default: productsRoutes } = await import('../../modules/products/http/routes.js');
 const { default: warehouseRoutes } = await import('../../modules/warehouse/http/routes.js');
 
@@ -58,6 +92,12 @@ const start = async () => {
     app.register(healthRoutes, { logLevel: 'silent' });
     app.register(i18nRoutes, { prefix: coreBasePath });
     app.register(authRoutes, { prefix: coreBasePath });
+    app.register(accessRoutes, { prefix: coreBasePath });
+    app.register(rbacRoutes, { prefix: coreBasePath });
+    app.register(authzRoutes, { prefix: coreBasePath });
+    app.register(settingsRoutes, { prefix: coreBasePath });
+    app.register(logsRoutes, { prefix: coreBasePath });
+    app.register(usersRoutes, { prefix: coreBasePath });
 
     app.register(productsRoutes, { prefix: apiBasePath });
     app.register(warehouseRoutes, { prefix: apiBasePath });
